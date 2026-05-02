@@ -1,6 +1,6 @@
 # TRUST — why you can believe the numbers
 
-**Date:** 2026-04-16
+**Date:** 2026-05-03
 **Scope:** every published result from this repo.
 
 This document answers two questions, in order:
@@ -156,7 +156,55 @@ no-fake-data guard scans the whole repo for denylisted patterns:
 `mulberry32`. Any match fails the build. A commit that invents numbers
 cannot reach `main`.
 
-### 2.8 Type safety
+### 2.8 Probability calibration — `apps/api/src/quant/ml/calibration.py`
+
+Tree ensembles produce miscalibrated `predict_proba` outputs by default — a
+70% predicted probability typically does not realize 70% of the time. The
+trainer therefore:
+
+1. Computes Expected Calibration Error (ECE) per class on the OOF predictions
+   (one-vs-rest, 15 bins).
+2. Fits one isotonic regression per class on the OOF labels — never on
+   training data, so purged-K-fold's leakage protections still hold.
+3. Recomputes ECE on the calibrated probabilities + writes both raw and
+   calibrated columns into `oof_predictions.csv`.
+
+Real measurement on the demo run (`sp500_lightgbm_v1`):
+
+```
+                    raw     calibrated   change
+ECE macro          0.0098   0.0056       −43%
+ECE class -1       0.0121   0.0034       −72%
+ECE class +1       0.0096   0.0033       −66%
+oof_logloss        0.9817   0.9790       −0.3%
+```
+
+If you build a trading rule on a model's probability output, the calibrated
+columns are the honest input. The raw columns are the un-corrected ones.
+
+### 2.9 Survivorship-bias correction — `apps/api/src/quant/backtest/universe_filter.py`
+
+The Kaggle 5y dataset used in the demo is a survivors-only universe — names
+that left the S&P 500 before the cutoff are absent. The walk-forward engine
+accepts a `universe_filter` callable that intersects the eligible set on each
+rebalance with point-in-time S&P 500 membership reconstructed from
+Wikipedia's changes table (`apps/api/src/quant/universe/point_in_time.py`).
+This kills the *joined-after* forward bias.
+
+Real measurement on the same momentum config (2014→2018):
+
+```
+                    survivors-only      point-in-time      gap
+Sharpe              1.725               1.112              −0.61
+AnnRet              22.48%              14.74%             −7.7 pp
+DSR P-value         0.998               0.927              −0.071
+```
+
+Closing the *exited-and-removed-from-data* bias requires a vendor with
+delisted-name price coverage (Polygon Stocks, Sharadar, Norgate). That is a
+documented gap; the filter does what is achievable on free, public data.
+
+### 2.10 Type safety
 
 `mypy --strict` across every file under `apps/api/src/quant` (68 files).
 Strict type-checking catches an entire class of silent bugs — wrong-shape
@@ -180,9 +228,17 @@ Given a claim like *"walk-forward Sharpe 1.7 on SP500 + NDX100 from 2018-2024"*:
 5. The report must carry an **MLflow run ID**. Every fold-level metric,
    hyperparameter, and artifact is logged there — you can re-walk the entire
    training trajectory.
+6. If the run is from the ML pipeline rather than a baseline signal, the
+   report must surface **OOF ECE both raw and calibrated**. A calibrated ECE
+   below ~0.05 means probabilities can be trusted as decision confidences;
+   above that, only the rank ordering is meaningful.
+7. If the run claims a Sharpe on an equity universe (S&P 500 / NDX 100), the
+   report must say whether the universe is **point-in-time or survivors-only**
+   and quote both numbers when both are available — survivorship can move
+   the Sharpe by ~0.6 units on this dataset.
 
-If any of those four artifacts (manifest, DSR, PBO, MLflow run) is missing,
-the number hasn't cleared the bar this repo sets for itself.
+If any of those artifacts is missing, the number hasn't cleared the bar this
+repo sets for itself.
 
 ---
 
@@ -207,6 +263,29 @@ the number hasn't cleared the bar this repo sets for itself.
 
 Gradient-boosted trees on triple-barrier labels, trained with purged K-Fold +
 embargo, evaluated with walk-forward backtests, reported with Deflated Sharpe
-and PBO, shipped with a reproducibility manifest. On real market data from
+and PBO, calibrated with isotonic regression, surfaced against point-in-time
+universes, shipped with a reproducibility manifest. On real market data from
 eleven keyed providers. No fake data, no deep-learning theatre, no numbers
 without a manifest attached.
+
+---
+
+## 6. The headline numbers, as of this writing
+
+All real, all reproducible (`apps/api/examples/backtest/artifacts/`).
+
+| Run | Universe | Sharpe | DSR P | AnnRet | DD | Notes |
+|---|---|---:|---:|---:|---:|---|
+| `sp500_momentum_126`     | survivors-only (505) | 1.725 | 0.998 | 22.48% | 8.4% | Headline momentum baseline |
+| `sp500_momentum_126_pit` | point-in-time S&P 500 | 1.112 | 0.927 | 14.74% | 10.0% | Same strategy, survivorship-corrected |
+| `sp500_ml_predictions_v1`| 100-symbol training subset | 1.408 | 1.000 | 16.06% | 8.0% | LightGBM signal, calibrated probs |
+| `sp500_momentum_sweep`   | 13 configs, raw universe | — | — | — | — | **PBO = 0.557** (cross-config selection bias) |
+
+The honest reading:
+- The headline 1.725 Sharpe inherits ~0.6 units of survivorship bias.
+- The same momentum strategy on a point-in-time universe is 1.112.
+- The LightGBM model on its smaller training universe is 1.408.
+- The 13-config sweep has a coin-flip-ish PBO — the in-sample winner is
+  roughly 56% likely to be below median out-of-sample.
+
+None of these numbers are alpha. All of them are honest.
