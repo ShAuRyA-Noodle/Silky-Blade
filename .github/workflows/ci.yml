@@ -175,7 +175,7 @@ jobs:
         run: |
           set -e
           mkdir -p apps/web/.oracle-artifacts
-          for run in sp500_momentum_126 sp500_momentum_126_pit sp500_momentum_sweep; do
+          for run in sp500_momentum_126 sp500_momentum_126_pit sp500_ml_predictions_v1 sp500_momentum_sweep; do
             src="apps/api/examples/backtest/artifacts/$run"
             if [ -d "$src" ]; then
               cp -R "$src" "apps/web/.oracle-artifacts/$run"

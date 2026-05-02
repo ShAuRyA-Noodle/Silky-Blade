@@ -108,6 +108,15 @@ export interface PointInTimeComparison {
     BacktestMetrics,
     "sharpe" | "annualized_return" | "max_drawdown" | "deflated_sharpe_p"
   >
+  /**
+   * Optional third run: the LightGBM model's OOF predictions priced through
+   * the same walk-forward engine. Universe is whatever the trainer used
+   * (a smaller training subset on this dataset).
+   */
+  readonly ml?: Pick<
+    BacktestMetrics,
+    "sharpe" | "annualized_return" | "max_drawdown" | "deflated_sharpe_p"
+  >
 }
 
 /**

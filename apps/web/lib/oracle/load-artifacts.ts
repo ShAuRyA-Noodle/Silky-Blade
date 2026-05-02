@@ -28,6 +28,7 @@ import type {
 
 const RUN_NAME = "sp500_momentum_126"
 const PIT_RUN_NAME = "sp500_momentum_126_pit"
+const ML_RUN_NAME = "sp500_ml_predictions_v1"
 const SWEEP_NAME = "sp500_momentum_sweep"
 
 const REGEN_HINT =
@@ -64,10 +65,6 @@ function artifactPath(file: string): string {
 
 function sweepArtifactPath(file: string): string {
   return resolveArtifact(SWEEP_NAME, file)
-}
-
-function pitArtifactPath(file: string): string {
-  return resolveArtifact(PIT_RUN_NAME, file)
 }
 
 function readJson<T>(file: string): T {
@@ -153,23 +150,26 @@ function validateManifest(manifest: BacktestManifest): void {
   }
 }
 
-function loadOptionalPitComparison(rawReport: BacktestReport): PointInTimeComparison | null {
-  // Optional. Absence does not break the build — the disclaimer paragraph
-  // covers the bias whether or not the comparison artifact is present.
-  const path = pitArtifactPath("report.json")
+function tryLoadMetricsBundle(
+  runName: string,
+): Pick<
+  BacktestReport["metrics"],
+  "sharpe" | "annualized_return" | "max_drawdown" | "deflated_sharpe_p"
+> | null {
+  const path = resolveArtifact(runName, "report.json")
   let raw: string
   try {
     raw = readFileSync(path, "utf8")
   } catch {
     return null
   }
-  let pitReport: BacktestReport
+  let parsed: BacktestReport
   try {
-    pitReport = JSON.parse(raw) as BacktestReport
+    parsed = JSON.parse(raw) as BacktestReport
   } catch {
     return null
   }
-  const m = pitReport.metrics
+  const m = parsed.metrics
   if (
     !Number.isFinite(m.sharpe) ||
     !Number.isFinite(m.annualized_return) ||
@@ -178,21 +178,31 @@ function loadOptionalPitComparison(rawReport: BacktestReport): PointInTimeCompar
   ) {
     return null
   }
-  const r = rawReport.metrics
   return {
+    sharpe: m.sharpe,
+    annualized_return: m.annualized_return,
+    max_drawdown: m.max_drawdown,
+    deflated_sharpe_p: m.deflated_sharpe_p,
+  }
+}
+
+function loadOptionalPitComparison(
+  rawReport: BacktestReport,
+): PointInTimeComparison | null {
+  const pit = tryLoadMetricsBundle(PIT_RUN_NAME)
+  if (pit === null) return null
+  const r = rawReport.metrics
+  const ml = tryLoadMetricsBundle(ML_RUN_NAME)
+  const out: PointInTimeComparison = {
     raw: {
       sharpe: r.sharpe,
       annualized_return: r.annualized_return,
       max_drawdown: r.max_drawdown,
       deflated_sharpe_p: r.deflated_sharpe_p,
     },
-    pit: {
-      sharpe: m.sharpe,
-      annualized_return: m.annualized_return,
-      max_drawdown: m.max_drawdown,
-      deflated_sharpe_p: m.deflated_sharpe_p,
-    },
+    pit,
   }
+  return ml ? { ...out, ml } : out
 }
 
 function loadOptionalSweep(): BacktestSweepReport | null {

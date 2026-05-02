@@ -99,34 +99,43 @@ export function HonestyBlock({ sweep, pitComparison }: HonestyBlockProps) {
           {pitComparison ? (
             <div className="rounded-2xl border border-primary/40 bg-card/50 backdrop-blur-xl p-6 md:p-8">
               <dt className="text-[10px] md:text-[11px] font-mono uppercase tracking-[0.22em] text-muted-foreground">
-                Survivorship-bias premium
+                Same engine, side-by-side
               </dt>
               <dd className="mt-3 text-4xl md:text-5xl font-semibold tracking-[-0.025em] text-primary tabular-nums">
                 −{formatSharpe(pitComparison.raw.sharpe - pitComparison.pit.sharpe)} Sharpe
               </dd>
               <p className="mt-4 text-sm md:text-base text-foreground leading-relaxed">
-                Same momentum strategy, two universes:
+                Survivorship correction; LightGBM model when available:
               </p>
-              <dl className="mt-3 grid grid-cols-2 gap-3 text-[12px] md:text-[13px] font-mono">
-                <div>
-                  <dt className="text-muted-foreground">Survivors-only</dt>
-                  <dd className="text-foreground tabular-nums">
+              <dl className="mt-3 space-y-2 text-[12px] md:text-[13px] font-mono">
+                <div className="flex items-baseline justify-between gap-3 border-b border-border/40 pb-2">
+                  <dt className="text-muted-foreground">Momentum · survivors-only</dt>
+                  <dd className="text-foreground tabular-nums whitespace-nowrap">
                     Sharpe {formatSharpe(pitComparison.raw.sharpe)} ·{" "}
                     {formatPercent(pitComparison.raw.annualized_return)} AnnRet
                   </dd>
                 </div>
-                <div>
-                  <dt className="text-muted-foreground">Point-in-time S&amp;P 500</dt>
-                  <dd className="text-foreground tabular-nums">
+                <div className="flex items-baseline justify-between gap-3 border-b border-border/40 pb-2">
+                  <dt className="text-muted-foreground">Momentum · point-in-time S&amp;P 500</dt>
+                  <dd className="text-foreground tabular-nums whitespace-nowrap">
                     Sharpe {formatSharpe(pitComparison.pit.sharpe)} ·{" "}
                     {formatPercent(pitComparison.pit.annualized_return)} AnnRet
                   </dd>
                 </div>
+                {pitComparison.ml ? (
+                  <div className="flex items-baseline justify-between gap-3">
+                    <dt className="text-muted-foreground">LightGBM · trainer subset</dt>
+                    <dd className="text-foreground tabular-nums whitespace-nowrap">
+                      Sharpe {formatSharpe(pitComparison.ml.sharpe)} ·{" "}
+                      {formatPercent(pitComparison.ml.annualized_return)} AnnRet
+                    </dd>
+                  </div>
+                ) : null}
               </dl>
               <p className="mt-3 text-[11px] md:text-xs font-mono text-muted-foreground/80 leading-relaxed">
-                Gap = the &ldquo;joined-after&rdquo; forward-looking bias in the
-                survivors-only dataset. Closing the &ldquo;exited-before&rdquo; gap
-                requires delisted-name price coverage (a tracked data gap).
+                Headline gap = &ldquo;joined-after&rdquo; forward bias in the
+                survivors-only dataset. ML row, when shown, is on a smaller
+                training universe — informative but not strictly apples-to-apples.
               </p>
             </div>
           ) : (
