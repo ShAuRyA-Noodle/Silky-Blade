@@ -29,10 +29,12 @@ universe_app = typer.Typer(help="Universe operations.")
 backfill_app = typer.Typer(help="Data backfills.")
 flow_app = typer.Typer(help="Run Prefect flows locally (no orchestrator).")
 backtest_app = typer.Typer(help="Walk-forward backtest runner + repro manifest.")
+ml_app = typer.Typer(help="ML trainer (LightGBM, triple-barrier, purged K-fold).")
 app.add_typer(universe_app, name="universe")
 app.add_typer(backfill_app, name="backfill")
 app.add_typer(flow_app, name="flow")
 app.add_typer(backtest_app, name="backtest")
+app.add_typer(ml_app, name="ml")
 
 
 def _setup_logging() -> None:
@@ -194,6 +196,32 @@ def backtest_run(
         f"AnnRet={m['annualized_return']:.2%}  AnnVol={m['annualized_vol']:.2%}"
     )
     typer.echo(f"Artifacts: {report['artifacts']['dir']}")
+
+
+# ---------------------------------------------------------------
+# ml
+# ---------------------------------------------------------------
+@ml_app.command("train")
+def ml_train(
+    config: Annotated[str, typer.Argument(help="Path to a YAML or JSON train config")],
+) -> None:
+    """Train one LightGBM model with purged K-fold + MLflow + artifact bundle."""
+    from quant.ml import load_config, train
+
+    _setup_logging()
+    cfg = load_config(config)
+    typer.echo(
+        f"Training '{cfg.name}' on {cfg.data.prices_csv} ({cfg.data.start_date} → {cfg.data.end_date})"
+    )
+    report = train(cfg)
+    oof = report["oof_metrics"]
+    typer.echo(
+        f"Done. logloss={oof['oof_logloss']:.4f}  "
+        f"bal_acc={oof['oof_balanced_accuracy']:.4f}  "
+        f"macro_auc_ovr={oof['oof_macro_auc_ovr']:.4f}"
+    )
+    typer.echo(f"MLflow run: {report['mlflow_run_id']}")
+    typer.echo(f"Artifacts:  {report['artifacts']['dir']}")
 
 
 if __name__ == "__main__":

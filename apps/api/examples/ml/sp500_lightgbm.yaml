@@ -1,0 +1,51 @@
+# Example LightGBM training config — real Kaggle S&P 500 5-year OHLCV.
+#
+# Run:  .venv/bin/python -m quant.cli ml train examples/ml/sp500_lightgbm.yaml
+#
+# Defaults match TRUST.md §1: multiclass triple-barrier on (-1, 0, +1) with
+# purged K-fold + 1% embargo. n_estimators is held at 200 — the goal of this
+# example is to prove the pipeline is real and reproducible, not to chase
+# headline AUC.
+
+name: sp500_lightgbm_v1
+output_dir: examples/ml/artifacts
+
+data:
+  prices_csv: ../../data/legacy/all_stocks_5yr.csv
+  start_date: 2013-02-08
+  end_date:   2018-02-07
+  # Cap symbol count so the pipeline stays under ~4 GB RAM on a laptop. Still
+  # real data — just fewer names. Removing or raising this means the full
+  # 505-symbol panel; do that on a workstation. The seed makes the subset
+  # deterministic so the manifest's data_fingerprint is stable run-to-run.
+  max_symbols: 100
+  symbol_seed: 42
+
+label:
+  horizon: 5
+  pt_sigma: 2.0
+  sl_sigma: 2.0
+  vol_window: 21
+
+cv:
+  n_splits: 5
+  embargo_frac: 0.01
+
+model:
+  num_boost_round: 200
+  early_stopping_rounds: 30
+  params:
+    objective: multiclass
+    num_class: 3
+    metric: multi_logloss
+    learning_rate: 0.05
+    num_leaves: 31
+    min_data_in_leaf: 50
+    feature_fraction: 0.8
+    bagging_fraction: 0.8
+    bagging_freq: 5
+    lambda_l1: 0.1
+    lambda_l2: 0.1
+    deterministic: true
+    seed: 42
+    verbose: -1
