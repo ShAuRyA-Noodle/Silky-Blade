@@ -396,6 +396,56 @@ def paper_plan(
 # ---------------------------------------------------------------
 # data — quality verification
 # ---------------------------------------------------------------
+@data_app.command("providers-health")
+def data_providers_health(
+    json_out: Annotated[str, typer.Option(help="Optional path to write the JSON report")] = "",
+    fail_on_error: Annotated[bool, typer.Option(help="Exit 1 if any configured provider fails")] = False,
+) -> None:
+    """Ping every keyed data provider; print PASS/FAIL + latency."""
+    from quant.data.providers_health import check_all
+
+    _setup_logging()
+    # Silence httpx + adapter loggers — health-check URLs include API keys
+    # for some providers (Polygon, FRED, AlphaVantage). Echoing them to a
+    # terminal is a leak vector. The user's terminal scrollback / shared
+    # screenshots / pasted bug reports must not contain key material.
+    for noisy in ("httpx", "httpcore", "quant.adapter"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
+
+    results = _run(check_all())
+    width = max(len(r.name) for r in results)
+    n_pass = n_fail = n_skip = 0
+    for r in results:
+        if not r.configured:
+            n_skip += 1
+            mark = "skip"
+        elif r.ok:
+            n_pass += 1
+            mark = "pass"
+        else:
+            n_fail += 1
+            mark = "FAIL"
+        latency = f"{r.latency_ms}ms" if r.latency_ms is not None else "—"
+        typer.echo(f"  {r.name:<{width}}  {mark:>4}  {latency:>6}  {r.detail}")
+    typer.echo(f"# {n_pass} pass, {n_fail} fail, {n_skip} not configured")
+    if json_out:
+        from pathlib import Path as _Path
+
+        payload = [
+            {
+                "name": r.name,
+                "configured": r.configured,
+                "ok": r.ok,
+                "detail": r.detail,
+                "latency_ms": r.latency_ms,
+            }
+            for r in results
+        ]
+        _Path(json_out).write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    if fail_on_error and n_fail > 0:
+        raise typer.Exit(code=1)
+
+
 @data_app.command("verify")
 def data_verify(
     path: Annotated[str, typer.Argument(help="Path to a prices CSV (date,symbol,adj_close)")],
