@@ -31,12 +31,14 @@ flow_app = typer.Typer(help="Run Prefect flows locally (no orchestrator).")
 backtest_app = typer.Typer(help="Walk-forward backtest runner + repro manifest.")
 ml_app = typer.Typer(help="ML trainer (LightGBM, triple-barrier, purged K-fold).")
 paper_app = typer.Typer(help="Paper-trading planning (no broker submission yet).")
+data_app = typer.Typer(help="Data-quality utilities (CSV verification, etc.).")
 app.add_typer(universe_app, name="universe")
 app.add_typer(backfill_app, name="backfill")
 app.add_typer(flow_app, name="flow")
 app.add_typer(backtest_app, name="backtest")
 app.add_typer(ml_app, name="ml")
 app.add_typer(paper_app, name="paper")
+app.add_typer(data_app, name="data")
 
 
 def _setup_logging() -> None:
@@ -389,6 +391,57 @@ def paper_plan(
         typer.echo(f"Plan written to {output} ({len(proposals)} orders)")
     else:
         typer.echo(payload)
+
+
+# ---------------------------------------------------------------
+# data — quality verification
+# ---------------------------------------------------------------
+@data_app.command("verify")
+def data_verify(
+    path: Annotated[str, typer.Argument(help="Path to a prices CSV (date,symbol,adj_close)")],
+    json_out: Annotated[str, typer.Option(help="Optional path to write the report as JSON")] = "",
+) -> None:
+    """Verify a prices CSV is fit for backtest. Exits 1 on any error."""
+    from quant.data import verify_prices_csv
+
+    _setup_logging()
+    rep = verify_prices_csv(path)
+
+    typer.echo(
+        f"# {rep.path}: rows={rep.rows} symbols={rep.symbols} "
+        f"window={rep.date_min}→{rep.date_max} "
+        f"errors={rep.n_errors} warnings={rep.n_warnings}"
+    )
+    for issue in rep.issues:
+        typer.echo(f"  [{issue.severity}] {issue.code}: {issue.message}")
+
+    if json_out:
+        from pathlib import Path as _Path
+
+        payload = {
+            "path": rep.path,
+            "rows": rep.rows,
+            "symbols": rep.symbols,
+            "date_min": rep.date_min.isoformat() if rep.date_min else None,
+            "date_max": rep.date_max.isoformat() if rep.date_max else None,
+            "ok": rep.ok,
+            "n_errors": rep.n_errors,
+            "n_warnings": rep.n_warnings,
+            "issues": [
+                {
+                    "severity": i.severity,
+                    "code": i.code,
+                    "message": i.message,
+                    "detail": i.detail,
+                }
+                for i in rep.issues
+            ],
+        }
+        _Path(json_out).write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
+        typer.echo(f"# JSON report → {json_out}")
+
+    if not rep.ok:
+        raise typer.Exit(code=1)
 
 
 if __name__ == "__main__":
