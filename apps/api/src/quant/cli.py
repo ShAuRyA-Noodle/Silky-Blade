@@ -30,11 +30,13 @@ backfill_app = typer.Typer(help="Data backfills.")
 flow_app = typer.Typer(help="Run Prefect flows locally (no orchestrator).")
 backtest_app = typer.Typer(help="Walk-forward backtest runner + repro manifest.")
 ml_app = typer.Typer(help="ML trainer (LightGBM, triple-barrier, purged K-fold).")
+paper_app = typer.Typer(help="Paper-trading planning (no broker submission yet).")
 app.add_typer(universe_app, name="universe")
 app.add_typer(backfill_app, name="backfill")
 app.add_typer(flow_app, name="flow")
 app.add_typer(backtest_app, name="backtest")
 app.add_typer(ml_app, name="ml")
+app.add_typer(paper_app, name="paper")
 
 
 def _setup_logging() -> None:
@@ -273,6 +275,120 @@ def ml_train(
     )
     typer.echo(f"MLflow run: {report['mlflow_run_id']}")
     typer.echo(f"Artifacts:  {report['artifacts']['dir']}")
+
+
+# ---------------------------------------------------------------
+# paper — plan paper-trading orders from a signal config
+# ---------------------------------------------------------------
+@paper_app.command("plan")
+def paper_plan(
+    config: Annotated[str, typer.Argument(help="Backtest YAML/JSON — uses its signal + walk_forward.top_k")],
+    as_of: Annotated[str, typer.Option(help="YYYY-MM-DD as-of date for scoring")],
+    portfolio_value: Annotated[float, typer.Option(help="Total dollars to allocate")] = 100_000.0,
+    positions: Annotated[
+        str, typer.Option(help="Path to positions JSON ([{symbol, quantity, last_price}, ...]); empty = flat")
+    ] = "",
+    output: Annotated[str, typer.Option(help="Optional path to write the JSON plan")] = "",
+) -> None:
+    """
+    Compute the orders that would bring `positions` to the model's target
+    allocation as-of `as_of`. No broker submission. Output is a JSON plan
+    a human reviews before any trade is placed.
+    """
+    from datetime import date as _date
+    from decimal import Decimal as _Decimal
+    from pathlib import Path as _Path
+
+    import polars as pl
+
+    from quant.backtest.runner import build_signal, load_config, load_prices_csv
+    from quant.execution.paper_session import (
+        Position,
+        TargetAllocation,
+        compute_target_orders,
+    )
+
+    _setup_logging()
+    cfg = load_config(config)
+    target_date = _date.fromisoformat(as_of)
+
+    prices = load_prices_csv(cfg.prices_csv, cfg.start_date, target_date)
+    if prices.is_empty():
+        raise typer.BadParameter(f"no prices for {cfg.prices_csv} up to {target_date}")
+
+    producer = build_signal(cfg.signal)
+    sigs = producer(target_date, prices)
+    if sigs.is_empty():
+        raise typer.BadParameter(f"signal returned empty at {target_date}")
+
+    top_k = cfg.walk_forward.top_k
+    top = sigs.sort("score", descending=True).head(top_k)
+    syms = top["symbol"].to_list()
+    weight_each = 1.0 / len(syms)
+    target_weights = dict.fromkeys(syms, weight_each)
+
+    # Resolve latest close per top-k symbol from the price panel.
+    last_prices_df = (
+        prices.filter(pl.col("symbol").is_in(syms))
+        .sort(["symbol", "date"])
+        .group_by("symbol", maintain_order=True)
+        .agg(pl.col("adj_close").last().alias("last"))
+    )
+    last_prices = {row["symbol"]: _Decimal(str(row["last"])) for row in last_prices_df.iter_rows(named=True)}
+
+    # Read current positions if provided, else flat.
+    current_positions: list[Position] = []
+    if positions:
+        with open(positions, encoding="utf-8") as fh:
+            for entry in json.load(fh):
+                sym = str(entry["symbol"])
+                current_positions.append(
+                    Position(
+                        symbol=sym,
+                        quantity=_Decimal(str(entry["quantity"])),
+                        last_price=_Decimal(str(entry.get("last_price", "0"))),
+                    )
+                )
+                # Carry over user-supplied price if our panel doesn't have it.
+                if sym not in last_prices and "last_price" in entry:
+                    last_prices[sym] = _Decimal(str(entry["last_price"]))
+
+    target = TargetAllocation(
+        weights=target_weights,
+        portfolio_value=_Decimal(str(portfolio_value)),
+    )
+    proposals = compute_target_orders(
+        current_positions=current_positions,
+        target=target,
+        latest_prices=last_prices,
+    )
+
+    plan = {
+        "as_of": target_date.isoformat(),
+        "config_name": cfg.name,
+        "signal_kind": cfg.signal.kind,
+        "top_k": top_k,
+        "portfolio_value": float(portfolio_value),
+        "target_weights": target_weights,
+        "proposed_orders": [
+            {
+                "symbol": p.symbol,
+                "side": p.side,
+                "quantity": str(p.quantity),
+                "delta_shares": str(p.delta_shares),
+                "target_value": str(p.target_value),
+                "current_value": str(p.current_value),
+            }
+            for p in proposals
+        ],
+    }
+
+    payload = json.dumps(plan, indent=2, default=str)
+    if output:
+        _Path(output).write_text(payload + "\n", encoding="utf-8")
+        typer.echo(f"Plan written to {output} ({len(proposals)} orders)")
+    else:
+        typer.echo(payload)
 
 
 if __name__ == "__main__":
