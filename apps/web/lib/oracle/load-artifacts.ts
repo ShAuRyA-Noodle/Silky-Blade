@@ -20,11 +20,13 @@ import { join } from "node:path"
 import type {
   BacktestManifest,
   BacktestReport,
+  BacktestSweepReport,
   EquityPoint,
   OracleArtifacts,
 } from "./types"
 
 const RUN_NAME = "sp500_momentum_126"
+const SWEEP_NAME = "sp500_momentum_sweep"
 
 const REGEN_HINT =
   "Regenerate with: cd apps/api && .venv/bin/python examples/backtest/prepare_sp500_5yr.py " +
@@ -40,6 +42,19 @@ function artifactPath(file: string): string {
     "backtest",
     "artifacts",
     RUN_NAME,
+    file,
+  )
+}
+
+function sweepArtifactPath(file: string): string {
+  return join(
+    process.cwd(),
+    "..",
+    "api",
+    "examples",
+    "backtest",
+    "artifacts",
+    SWEEP_NAME,
     file,
   )
 }
@@ -127,6 +142,33 @@ function validateManifest(manifest: BacktestManifest): void {
   }
 }
 
+function loadOptionalSweep(): BacktestSweepReport | null {
+  // Sweep is optional — its absence does not break the build. PBO is a
+  // diagnostic, not a contract. If the user hasn't run the sweep yet the
+  // page renders without the PBO panel rather than fabricating one.
+  const path = sweepArtifactPath("sweep_report.json")
+  let raw: string
+  try {
+    raw = readFileSync(path, "utf8")
+  } catch {
+    return null
+  }
+  let parsed: BacktestSweepReport
+  try {
+    parsed = JSON.parse(raw) as BacktestSweepReport
+  } catch (err) {
+    throw new Error(
+      `[oracle] sweep_report.json at ${path} is not valid JSON. ${(err as Error).message}`,
+    )
+  }
+  if (!Number.isFinite(parsed.pbo) || parsed.pbo < 0 || parsed.pbo > 1) {
+    throw new Error(
+      `[oracle] sweep_report.json at ${path} has invalid pbo: ${String(parsed.pbo)}`,
+    )
+  }
+  return parsed
+}
+
 /**
  * Load and validate the full artifact bundle. Called once at build time
  * from the Oracle page; the parsed result is then statically embedded in
@@ -149,6 +191,7 @@ export function loadOracleArtifacts(): OracleArtifacts {
     )
   }
   const equityCurve = parseEquityCurve(equityRaw)
+  const sweep = loadOptionalSweep()
 
-  return { report, manifest, equityCurve }
+  return { report, manifest, equityCurve, sweep }
 }

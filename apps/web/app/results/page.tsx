@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 
 import { EquityCurve } from "@/components/oracle/equity-curve"
+import { HonestyBlock } from "@/components/oracle/honesty-block"
 import { KpiGrid } from "@/components/oracle/kpi-grid"
 import { OracleHero } from "@/components/oracle/oracle-hero"
 import { ReproBlock } from "@/components/oracle/repro-block"
@@ -41,12 +42,13 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default function ResultsPage() {
-  const { report, manifest, equityCurve } = loadOracleArtifacts()
+  const { report, manifest, equityCurve, sweep } = loadOracleArtifacts()
 
   return (
     <main id="oracle-results" className="relative">
       <OracleHero report={report} />
       <KpiGrid report={report} />
+      <HonestyBlock sweep={sweep} />
       <EquityCurve
         points={equityCurve}
         initialCapital={report.walk_forward.initial_capital}

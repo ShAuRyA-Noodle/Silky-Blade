@@ -63,11 +63,46 @@ export interface EquityPoint {
 }
 
 /**
+ * One row of a backtest sweep — Sharpe + DSR for one config in a grid.
+ * Mirrors the per-run shape in `quant.backtest.sweep.run_sweep`.
+ */
+export interface SweepRunSummary {
+  readonly name: string
+  readonly sharpe: number
+  readonly deflated_sharpe_p: number
+  readonly annualized_return: number
+  readonly annualized_vol: number
+  readonly max_drawdown: number
+  readonly turnover: number
+  readonly artifacts_dir: string
+}
+
+/**
+ * Cross-config sweep report. PBO = Probability of Backtest Overfitting via
+ * CSCV (López de Prado 2016). PBO ∈ [0, 1]; > 0.5 means the in-sample
+ * winner is more likely than not below median out of sample.
+ */
+export interface BacktestSweepReport {
+  readonly name: string
+  readonly window: { readonly start: string; readonly end: string }
+  readonly n_configs: number
+  readonly n_observations_per_config: number
+  readonly aligned_date_range: { readonly start: string; readonly end: string }
+  readonly pbo: number
+  readonly cscv_S: number
+  readonly cscv_n_trials: number
+  readonly runs: readonly SweepRunSummary[]
+}
+
+/**
  * Bundle of everything the Oracle results page needs to render. The page
- * receives this as a single static prop assembled at build time.
+ * receives this as a single static prop assembled at build time. `sweep`
+ * is optional — missing sweep = page renders without the PBO panel,
+ * never falls back to fabricated numbers.
  */
 export interface OracleArtifacts {
   readonly report: BacktestReport
   readonly manifest: BacktestManifest
   readonly equityCurve: readonly EquityPoint[]
+  readonly sweep: BacktestSweepReport | null
 }
