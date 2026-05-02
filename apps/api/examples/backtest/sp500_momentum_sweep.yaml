@@ -1,0 +1,52 @@
+# Example sweep config — momentum lookback grid on the Kaggle S&P 500 5-year
+# snapshot, with cross-config Probability of Backtest Overfitting (PBO) via CSCV.
+#
+# Run:  python -m quant.cli backtest sweep examples/backtest/sp500_momentum_sweep.yaml
+#
+# Why this matters: the Deflated Sharpe Ratio adjusts a single Sharpe for the
+# trial pool size. PBO is the complementary diagnostic — given a *grid* of
+# competing configs over the same window, how often is the in-sample winner
+# below median out of sample? PBO requires the full N-config returns matrix;
+# it cannot be computed from one run.
+
+name: sp500_momentum_sweep
+prices_csv: examples/backtest/sp500_5yr_adjusted.csv
+start_date: 2014-01-02
+end_date:   2018-02-07
+output_dir: examples/backtest/artifacts
+
+walk_forward_base:
+  train_days: 252
+  test_days: 21
+  top_k: 25
+  cost_bps: 5.0
+  initial_capital: 100000.0
+
+stats_base:
+  sharpes_std: 0.5
+
+# Number of CSCV slices. Even integer. Must be <= number of aligned rebalance dates.
+n_slices: 8
+
+# All runs must share train_days/test_days (cadence alignment for PBO).
+# top_k overrides are fine — those don't shift rebalance dates.
+runs:
+  - name: mom_42
+    signal: { kind: momentum, params: { lookback_days: 42 } }
+  - name: mom_63
+    signal: { kind: momentum, params: { lookback_days: 63 } }
+  - name: mom_126
+    signal: { kind: momentum, params: { lookback_days: 126 } }
+  - name: mom_189
+    signal: { kind: momentum, params: { lookback_days: 189 } }
+  - name: mom_252
+    signal: { kind: momentum, params: { lookback_days: 252 } }
+  - name: mom_126_top10
+    signal: { kind: momentum, params: { lookback_days: 126 } }
+    walk_forward_overrides: { top_k: 10 }
+  - name: mom_126_top50
+    signal: { kind: momentum, params: { lookback_days: 126 } }
+    walk_forward_overrides: { top_k: 50 }
+  - name: mom_126_lowcost
+    signal: { kind: momentum, params: { lookback_days: 126 } }
+    walk_forward_overrides: { cost_bps: 1.0 }

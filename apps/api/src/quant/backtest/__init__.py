@@ -21,6 +21,12 @@ from quant.backtest.statistics import (
     probability_of_backtest_overfitting,
     sharpe_ratio,
 )
+from quant.backtest.sweep import (
+    SweepConfig,
+    SweepRunSpec,
+    load_sweep_config,
+    run_sweep,
+)
 
 __all__ = [
     "BacktestResult",
@@ -30,13 +36,17 @@ __all__ = [
     "SignalProducer",
     "SignalSpec",
     "StatsSpec",
+    "SweepConfig",
+    "SweepRunSpec",
     "WalkForwardConfig",
     "build_manifest",
     "deflated_sharpe_ratio",
     "load_config",
     "load_prices_csv",
+    "load_sweep_config",
     "probability_of_backtest_overfitting",
     "run_backtest",
+    "run_sweep",
     "sharpe_ratio",
     "walk_forward",
 ]

@@ -196,5 +196,32 @@ def backtest_run(
     typer.echo(f"Artifacts: {report['artifacts']['dir']}")
 
 
+@backtest_app.command("sweep")
+def backtest_sweep(
+    config: Annotated[str, typer.Argument(help="Path to a YAML or JSON sweep config")],
+) -> None:
+    """Run a multi-config sweep and emit cross-config PBO + per-run DSR."""
+    from quant.backtest.sweep import load_sweep_config, run_sweep
+
+    _setup_logging()
+    cfg = load_sweep_config(config)
+    typer.echo(
+        f"Running sweep '{cfg.name}' ({cfg.start_date} → {cfg.end_date})  "
+        f"n_runs={len(cfg.runs)}  cscv_S={cfg.n_slices}"
+    )
+    report = run_sweep(cfg)
+    typer.echo(
+        f"PBO={report['pbo']:.3f}  n_obs/config={report['n_observations_per_config']}  "
+        f"cscv_trials={report['cscv_n_trials']}"
+    )
+    for r in report["runs"]:
+        typer.echo(
+            f"  {r['name']:<28}  Sharpe={r['sharpe']:>6.3f}  "
+            f"DSR P={r['deflated_sharpe_p']:>6.3f}  "
+            f"DD={r['max_drawdown']:>6.1%}  Turn={r['turnover']:>5.1f}x"
+        )
+    typer.echo(f"Artifacts: {report['artifacts']['dir']}")
+
+
 if __name__ == "__main__":
     app()
