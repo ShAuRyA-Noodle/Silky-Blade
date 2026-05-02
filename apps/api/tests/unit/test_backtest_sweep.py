@@ -125,9 +125,7 @@ def test_run_sweep_rejects_cadence_override(tmp_path: Path, prices_csv: Path) ->
         walk_forward_base=WalkForwardConfig(train_days=60, test_days=5, top_k=3, cost_bps=2.0),
         stats_base=StatsSpec(n_trials=1, sharpes_std=0.3),
         runs=(
-            SweepRunSpec(
-                name="a", signal=SignalSpec(kind="momentum", params={"lookback_days": 20})
-            ),
+            SweepRunSpec(name="a", signal=SignalSpec(kind="momentum", params={"lookback_days": 20})),
             SweepRunSpec(
                 name="b",
                 signal=SignalSpec(kind="momentum", params={"lookback_days": 40}),
