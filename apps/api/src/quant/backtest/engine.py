@@ -143,7 +143,11 @@ def _portfolio_return(slice_df: pl.DataFrame, weights: dict[str, float]) -> floa
     if slice_df.is_empty():
         return 0.0
     # Per-symbol return from first to last close in the slice.
-    agg = slice_df.group_by("symbol").agg(
+    # `maintain_order=True` keeps group iteration order stable. Note: this alone
+    # does NOT make the run bit-exact — Polars' multi-threaded reductions still
+    # produce ULP-level drift (~1e-15) in float64 sums. Bit-exact reproducibility
+    # requires `POLARS_MAX_THREADS=1` in the environment. See REPRODUCE.md.
+    agg = slice_df.group_by("symbol", maintain_order=True).agg(
         [pl.col("adj_close").first().alias("p0"), pl.col("adj_close").last().alias("p1")]
     )
     total = 0.0
