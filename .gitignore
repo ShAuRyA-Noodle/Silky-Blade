@@ -61,11 +61,19 @@ data/legacy/*
 *.parquet
 *.feather
 
-# ---- Backtest example derived artifacts (regenerable via examples/backtest/*) ----
+# ---- Backtest example derived artifacts ----
+# The adapted CSV is large (~30MB) and regenerable from data/legacy/.
 apps/api/examples/backtest/sp500_5yr_adjusted.csv
-apps/api/examples/backtest/artifacts/
+# By default, artifacts are gitignored (regenerable). Force-track the
+# specific demo bundles so the web build + CI have real, committed numbers
+# without needing the 28MB source dataset to regenerate.
+apps/api/examples/backtest/artifacts/*
+!apps/api/examples/backtest/artifacts/sp500_momentum_126/
+!apps/api/examples/backtest/artifacts/sp500_momentum_sweep/
 
-# ---- ML trainer derived artifacts (regenerable via examples/ml/*) ----
+# ---- ML trainer derived artifacts ----
+# Same pattern — by default ignore, but if a committed demo bundle is
+# added later, force-track its directory with a !rule.
 apps/api/examples/ml/artifacts/
 
 # ---- Models (tracked via MLflow) ----

@@ -1,0 +1,108 @@
+{
+  "name": "sp500_momentum_sweep",
+  "window": {
+    "start": "2014-01-02",
+    "end": "2018-02-07"
+  },
+  "n_configs": 8,
+  "n_observations_per_config": 36,
+  "aligned_date_range": {
+    "start": "2015-03-04",
+    "end": "2018-02-01"
+  },
+  "pbo": 0.5285714285714286,
+  "cscv_S": 8,
+  "cscv_n_trials": 70,
+  "runs": [
+    {
+      "name": "mom_42",
+      "sharpe": 0.7468807681957504,
+      "deflated_sharpe_p": 0.6432822889898457,
+      "annualized_return": 0.08329189153133187,
+      "annualized_vol": 0.11151966294773016,
+      "max_drawdown": 0.16733558204478347,
+      "turnover": 26.58000000000001,
+      "artifacts_dir": "examples/backtest/artifacts/sp500_momentum_sweep/per_run/mom_42"
+    },
+    {
+      "name": "mom_63",
+      "sharpe": 1.3219575873743443,
+      "deflated_sharpe_p": 0.9672002612300872,
+      "annualized_return": 0.17401708635917768,
+      "annualized_vol": 0.13163590724934546,
+      "max_drawdown": 0.1287059146925198,
+      "turnover": 21.900000000000002,
+      "artifacts_dir": "examples/backtest/artifacts/sp500_momentum_sweep/per_run/mom_63"
+    },
+    {
+      "name": "mom_126",
+      "sharpe": 1.7253327419472237,
+      "deflated_sharpe_p": 0.9982101383952537,
+      "annualized_return": 0.2247613329471032,
+      "annualized_vol": 0.1302712963607448,
+      "max_drawdown": 0.0835812109654376,
+      "turnover": 15.060000000000002,
+      "artifacts_dir": "examples/backtest/artifacts/sp500_momentum_sweep/per_run/mom_126"
+    },
+    {
+      "name": "mom_189",
+      "sharpe": 1.3950759682481082,
+      "deflated_sharpe_p": 0.9950756622652129,
+      "annualized_return": 0.18413529903566417,
+      "annualized_vol": 0.13198944231466864,
+      "max_drawdown": 0.08966891477211511,
+      "turnover": 13.260000000000002,
+      "artifacts_dir": "examples/backtest/artifacts/sp500_momentum_sweep/per_run/mom_189"
+    },
+    {
+      "name": "mom_252",
+      "sharpe": 1.045471208766795,
+      "deflated_sharpe_p": 0.8742703577042046,
+      "annualized_return": 0.1274751289763707,
+      "annualized_vol": 0.12193078863141182,
+      "max_drawdown": 0.13779687415193614,
+      "turnover": 12.540000000000003,
+      "artifacts_dir": "examples/backtest/artifacts/sp500_momentum_sweep/per_run/mom_252"
+    },
+    {
+      "name": "mom_126_top10",
+      "sharpe": 1.7525905714043657,
+      "deflated_sharpe_p": 0.9999162173590126,
+      "annualized_return": 0.29854918591983415,
+      "annualized_vol": 0.1703473650897278,
+      "max_drawdown": 0.08311522292152808,
+      "turnover": 16.8,
+      "artifacts_dir": "examples/backtest/artifacts/sp500_momentum_sweep/per_run/mom_126_top10"
+    },
+    {
+      "name": "mom_126_top50",
+      "sharpe": 1.3880182824424314,
+      "deflated_sharpe_p": 0.9853532899525524,
+      "annualized_return": 0.15904314644537543,
+      "annualized_vol": 0.11458289019472753,
+      "max_drawdown": 0.08684266984134983,
+      "turnover": 14.200000000000003,
+      "artifacts_dir": "examples/backtest/artifacts/sp500_momentum_sweep/per_run/mom_126_top50"
+    },
+    {
+      "name": "mom_126_lowcost",
+      "sharpe": 1.7432071879908981,
+      "deflated_sharpe_p": 0.9983905346032313,
+      "annualized_return": 0.22715683811677323,
+      "annualized_vol": 0.13030971859322055,
+      "max_drawdown": 0.08265687689885305,
+      "turnover": 15.060000000000002,
+      "artifacts_dir": "examples/backtest/artifacts/sp500_momentum_sweep/per_run/mom_126_lowcost"
+    }
+  ],
+  "run_order": [
+    "mom_42",
+    "mom_63",
+    "mom_126",
+    "mom_189",
+    "mom_252",
+    "mom_126_top10",
+    "mom_126_top50",
+    "mom_126_lowcost"
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "name": "mom_126_top50",
+  "window": {
+    "start": "2014-01-02",
+    "end": "2018-02-07",
+    "n_rebalances": 37
+  },
+  "metrics": {
+    "total_return": 0.5763056907210709,
+    "annualized_return": 0.15904314644537543,
+    "annualized_vol": 0.11458289019472753,
+    "sharpe": 1.3880182824424314,
+    "max_drawdown": 0.08684266984134983,
+    "turnover": 14.200000000000003,
+    "deflated_sharpe_p": 0.9853532899525524,
+    "dsr_n_trials": 8,
+    "dsr_sharpes_std": 0.5,
+    "return_skew": -0.43198056888692166,
+    "return_kurtosis": 3.8496614176283392
+  },
+  "walk_forward": {
+    "train_days": 252,
+    "test_days": 21,
+    "top_k": 50,
+    "cost_bps": 5.0,
+    "initial_capital": 100000.0
+  },
+  "signal": {
+    "kind": "momentum",
+    "params": {
+      "lookback_days": 126
+    }
+  }
+}
