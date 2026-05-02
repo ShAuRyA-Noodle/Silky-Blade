@@ -42,6 +42,11 @@ class Settings(BaseSettings):
     - Tier-2/3 keys are optional but warn at boot if missing.
     - DB/Redis/MinIO URLs are required.
     - `JWT_SECRET_KEY` must be non-default in non-development envs.
+
+    Backtest artifacts:
+    - `backtest_artifact_root` is the on-disk root that the backtest CLI
+      writes its `<run_name>/{report,equity_curve,manifest,config.snapshot}`
+      bundles to. The HTTP layer reads from the same path, read-only.
     """
 
     model_config = SettingsConfigDict(
@@ -162,6 +167,11 @@ class Settings(BaseSettings):
     drawdown_kill_pct: float = 0.15
     transaction_cost_bps: float = 5.0
     slippage_bps: float = 3.0
+
+    # ============================================================
+    # BACKTEST ARTIFACTS
+    # ============================================================
+    backtest_artifact_root: Path = Path("./examples/backtest/artifacts")
 
     # ============================================================
     # Validators
