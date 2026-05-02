@@ -73,6 +73,11 @@ class RunConfig:
     walk_forward: WalkForwardConfig = field(default_factory=WalkForwardConfig)
     signal: SignalSpec = field(default_factory=SignalSpec)
     stats: StatsSpec = field(default_factory=StatsSpec)
+    # Universe enforcement at each rebalance:
+    #   "raw"        : no filter — uses every symbol present in prices_csv.
+    #   "sp500_pit"  : intersect with point-in-time S&P 500 membership at
+    #                  the rebalance date (Wikipedia-sourced).
+    universe: str = "raw"
 
 
 # ------------------------------------------------------------------
@@ -120,6 +125,7 @@ def _coerce_config(data: dict[str, Any]) -> RunConfig:
             n_trials=int(stats.get("n_trials", 1)),
             sharpes_std=float(stats.get("sharpes_std", 0.5)),
         ),
+        universe=str(data.get("universe", "raw")),
     )
 
 
@@ -140,6 +146,23 @@ def build_signal(spec: SignalSpec) -> SignalProducer:
     if spec.kind == "mean_reversion":
         return MeanReversionSignal(lookback_days=int(spec.params.get("lookback_days", 5)))
     raise ValueError(f"unknown signal kind: {spec.kind!r}")
+
+
+# ------------------------------------------------------------------
+# Universe filter registry
+# ------------------------------------------------------------------
+def _build_universe_filter(name: str) -> Any:
+    """Resolve the `universe` config value to a UniverseFilter callable, or None."""
+    if name == "raw":
+        return None
+    if name == "sp500_pit":
+        # Local import — point_in_time fetches Wikipedia at construction time,
+        # so we only pay that cost when the user opted in.
+        from quant.backtest.universe_filter import point_in_time_sp500_filter
+
+        log.info("universe=sp500_pit — fetching Wikipedia changes table")
+        return point_in_time_sp500_filter()
+    raise ValueError(f"unknown universe filter: {name!r}")
 
 
 # ------------------------------------------------------------------
@@ -168,7 +191,8 @@ def run_backtest(cfg: RunConfig) -> dict[str, Any]:
         raise RuntimeError(f"no price rows in {cfg.prices_csv} for {cfg.start_date}→{cfg.end_date}")
 
     producer = build_signal(cfg.signal)
-    result = walk_forward(prices, producer, cfg.walk_forward)
+    universe_filter = _build_universe_filter(cfg.universe)
+    result = walk_forward(prices, producer, cfg.walk_forward, universe_filter=universe_filter)
 
     # Per-period returns → annualized numbers already on result; compute DSR.
     rets = result.per_period_returns
@@ -283,6 +307,7 @@ def _config_to_dict(cfg: RunConfig) -> dict[str, Any]:
         },
         "signal": {"kind": cfg.signal.kind, "params": cfg.signal.params},
         "stats": {"n_trials": cfg.stats.n_trials, "sharpes_std": cfg.stats.sharpes_std},
+        "universe": cfg.universe,
     }
 
 

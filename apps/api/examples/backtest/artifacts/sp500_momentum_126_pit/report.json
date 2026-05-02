@@ -1,0 +1,34 @@
+{
+  "name": "sp500_momentum_126_pit",
+  "window": {
+    "start": "2014-01-02",
+    "end": "2018-02-07",
+    "n_rebalances": 37
+  },
+  "metrics": {
+    "total_return": 0.5278626632080483,
+    "annualized_return": 0.14736876296868284,
+    "annualized_vol": 0.13246742310037157,
+    "sharpe": 1.112490599722925,
+    "max_drawdown": 0.10034727825333906,
+    "turnover": 15.779999999999998,
+    "deflated_sharpe_p": 0.9271120706790379,
+    "dsr_n_trials": 8,
+    "dsr_sharpes_std": 0.5,
+    "return_skew": -0.6561722190893078,
+    "return_kurtosis": 3.1708362643039356
+  },
+  "walk_forward": {
+    "train_days": 252,
+    "test_days": 21,
+    "top_k": 25,
+    "cost_bps": 5.0,
+    "initial_capital": 100000.0
+  },
+  "signal": {
+    "kind": "momentum",
+    "params": {
+      "lookback_days": 126
+    }
+  }
+}

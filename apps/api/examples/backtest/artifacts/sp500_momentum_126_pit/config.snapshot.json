@@ -1,0 +1,25 @@
+{
+  "name": "sp500_momentum_126_pit",
+  "prices_csv": "examples/backtest/sp500_5yr_adjusted.csv",
+  "start_date": "2014-01-02",
+  "end_date": "2018-02-07",
+  "output_dir": "examples/backtest/artifacts",
+  "walk_forward": {
+    "train_days": 252,
+    "test_days": 21,
+    "top_k": 25,
+    "cost_bps": 5.0,
+    "initial_capital": 100000.0
+  },
+  "signal": {
+    "kind": "momentum",
+    "params": {
+      "lookback_days": 126
+    }
+  },
+  "stats": {
+    "n_trials": 8,
+    "sharpes_std": 0.5
+  },
+  "universe": "sp500_pit"
+}

@@ -1,0 +1,32 @@
+# Same momentum config as sp500_momentum.yaml, but with point-in-time
+# S&P 500 membership enforced at each rebalance. The Wikipedia changes
+# table is fetched once at construction time.
+#
+# Run:  python -m quant.cli backtest run examples/backtest/sp500_momentum_pit.yaml
+#
+# Compare numbers vs the non-PIT run to see the size of the
+# "joined-after" forward-looking bias hidden in the survivors-only CSV.
+
+name: sp500_momentum_126_pit
+prices_csv: examples/backtest/sp500_5yr_adjusted.csv
+start_date: 2014-01-02
+end_date:   2018-02-07
+output_dir: examples/backtest/artifacts
+
+universe: sp500_pit
+
+walk_forward:
+  train_days: 252
+  test_days: 21
+  top_k: 25
+  cost_bps: 5.0
+  initial_capital: 100000.0
+
+signal:
+  kind: momentum
+  params:
+    lookback_days: 126
+
+stats:
+  n_trials: 8
+  sharpes_std: 0.5

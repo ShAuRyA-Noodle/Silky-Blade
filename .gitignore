@@ -69,6 +69,7 @@ apps/api/examples/backtest/sp500_5yr_adjusted.csv
 # without needing the 28MB source dataset to regenerate.
 apps/api/examples/backtest/artifacts/*
 !apps/api/examples/backtest/artifacts/sp500_momentum_126/
+!apps/api/examples/backtest/artifacts/sp500_momentum_126_pit/
 !apps/api/examples/backtest/artifacts/sp500_momentum_sweep/
 
 # ---- ML trainer derived artifacts ----

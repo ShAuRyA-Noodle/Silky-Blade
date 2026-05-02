@@ -15,6 +15,7 @@ OrderService. This engine is for offline strategy evaluation:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Protocol
@@ -27,6 +28,12 @@ class SignalProducer(Protocol):
     """Produce a DataFrame with columns [symbol, score] for a given as-of date."""
 
     def __call__(self, as_of: date, history: pl.DataFrame) -> pl.DataFrame: ...
+
+
+# A universe filter restricts the eligible symbol set on each rebalance.
+# Returning `None` means "no restriction at this date" (treat as the full
+# inferred universe); returning an empty set means "no symbol passes."
+UniverseFilter = Callable[[date], "set[str] | None"]
 
 
 @dataclass
@@ -55,10 +62,16 @@ def walk_forward(
     prices: pl.DataFrame,
     produce_signals: SignalProducer,
     config: WalkForwardConfig,
+    *,
+    universe_filter: UniverseFilter | None = None,
 ) -> BacktestResult:
     """
     prices: polars DataFrame with columns ['date', 'symbol', 'adj_close'].
     produce_signals: callable (as_of, history_up_to_as_of) -> DataFrame[symbol, score].
+    universe_filter: optional callable (rebalance_date) -> set[str]; when provided,
+        signal scores are intersected with the eligible set for that date BEFORE
+        top-k selection. Used to enforce point-in-time S&P 500 membership and
+        kill the "joined-later" forward bias hidden in survivors-only datasets.
     """
     if not {"date", "symbol", "adj_close"}.issubset(prices.columns):
         raise ValueError("prices must have columns [date, symbol, adj_close]")
@@ -83,6 +96,13 @@ def walk_forward(
         if sigs.is_empty():
             i += config.test_days
             continue
+        if universe_filter is not None:
+            eligible = universe_filter(rebalance_date)
+            if eligible is not None:
+                sigs = sigs.filter(pl.col("symbol").is_in(list(eligible)))
+                if sigs.is_empty():
+                    i += config.test_days
+                    continue
         top = sigs.sort("score", descending=True).head(config.top_k)
         syms = top.get_column("symbol").to_list()
         if not syms:
