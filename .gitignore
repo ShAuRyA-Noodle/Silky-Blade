@@ -65,6 +65,9 @@ data/legacy/*
 apps/api/examples/backtest/sp500_5yr_adjusted.csv
 apps/api/examples/backtest/artifacts/
 
+# ---- ML trainer derived artifacts (regenerable via examples/ml/*) ----
+apps/api/examples/ml/artifacts/
+
 # ---- Models (tracked via MLflow) ----
 apps/api/models/*.pkl
 apps/api/models/*.joblib
