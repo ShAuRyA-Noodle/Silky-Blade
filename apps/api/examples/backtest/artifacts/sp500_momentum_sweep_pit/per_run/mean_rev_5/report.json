@@ -1,0 +1,34 @@
+{
+  "name": "mean_rev_5",
+  "window": {
+    "start": "2014-01-02",
+    "end": "2018-02-07",
+    "n_rebalances": 37
+  },
+  "metrics": {
+    "total_return": 0.4622604722030812,
+    "annualized_return": 0.13115348375973213,
+    "annualized_vol": 0.1683136856911707,
+    "sharpe": 0.7792205560775269,
+    "max_drawdown": 0.2758068791295962,
+    "turnover": 33.420000000000016,
+    "deflated_sharpe_p": 0.5648151125616312,
+    "dsr_n_trials": 13,
+    "dsr_sharpes_std": 0.5,
+    "return_skew": -0.6071566247493394,
+    "return_kurtosis": 4.44192189592464
+  },
+  "walk_forward": {
+    "train_days": 252,
+    "test_days": 21,
+    "top_k": 25,
+    "cost_bps": 5.0,
+    "initial_capital": 100000.0
+  },
+  "signal": {
+    "kind": "mean_reversion",
+    "params": {
+      "lookback_days": 5
+    }
+  }
+}

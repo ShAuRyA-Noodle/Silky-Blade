@@ -1,0 +1,34 @@
+{
+  "name": "mom_126_lowcost",
+  "window": {
+    "start": "2014-01-02",
+    "end": "2018-02-07",
+    "n_rebalances": 37
+  },
+  "metrics": {
+    "total_return": 0.5375383600743153,
+    "annualized_return": 0.14972030964790473,
+    "annualized_vol": 0.13249235509153298,
+    "sharpe": 1.130029800923002,
+    "max_drawdown": 0.09942544028022635,
+    "turnover": 15.779999999999998,
+    "deflated_sharpe_p": 0.8510071008003438,
+    "dsr_n_trials": 13,
+    "dsr_sharpes_std": 0.5,
+    "return_skew": -0.6550966377482325,
+    "return_kurtosis": 3.1683877018889386
+  },
+  "walk_forward": {
+    "train_days": 252,
+    "test_days": 21,
+    "top_k": 25,
+    "cost_bps": 1.0,
+    "initial_capital": 100000.0
+  },
+  "signal": {
+    "kind": "momentum",
+    "params": {
+      "lookback_days": 126
+    }
+  }
+}

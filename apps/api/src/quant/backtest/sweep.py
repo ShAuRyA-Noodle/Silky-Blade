@@ -96,6 +96,10 @@ class SweepConfig:
     stats_base: StatsSpec = field(default_factory=StatsSpec)
     runs: tuple[SweepRunSpec, ...] = ()
     n_slices: int = 8
+    # Sweep-wide universe filter — applied identically to every run so PBO
+    # measures selection bias under the SAME survivorship treatment.
+    # "raw" (no filter) | "sp500_pit" (point-in-time S&P 500 membership).
+    universe: str = "raw"
 
 
 # ------------------------------------------------------------------
@@ -172,6 +176,7 @@ def _coerce_sweep_config(data: dict[str, Any]) -> SweepConfig:
         ),
         runs=tuple(runs),
         n_slices=int(data.get("n_slices", 8)),
+        universe=str(data.get("universe", "raw")),
     )
 
 
@@ -217,6 +222,7 @@ def _resolve_run(sweep: SweepConfig, run: SweepRunSpec, *, n_runs: int) -> RunCo
         walk_forward=wf,
         signal=run.signal,
         stats=stats,
+        universe=sweep.universe,
     )
 
 
@@ -398,6 +404,7 @@ def _sweep_to_dict(cfg: SweepConfig) -> dict[str, Any]:
             "sharpes_std": cfg.stats_base.sharpes_std,
         },
         "n_slices": cfg.n_slices,
+        "universe": cfg.universe,
         "runs": [
             {
                 "name": r.name,

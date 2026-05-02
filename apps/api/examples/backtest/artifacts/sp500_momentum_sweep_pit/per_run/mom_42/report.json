@@ -1,0 +1,34 @@
+{
+  "name": "mom_42",
+  "window": {
+    "start": "2014-01-02",
+    "end": "2018-02-07",
+    "n_rebalances": 37
+  },
+  "metrics": {
+    "total_return": 0.1715063565858419,
+    "annualized_return": 0.05267803708059504,
+    "annualized_vol": 0.11872296888405148,
+    "sharpe": 0.4437055236720204,
+    "max_drawdown": 0.19101151692299945,
+    "turnover": 26.300000000000004,
+    "deflated_sharpe_p": 0.0631982693217576,
+    "dsr_n_trials": 13,
+    "dsr_sharpes_std": 0.5,
+    "return_skew": -0.49399032942216586,
+    "return_kurtosis": 4.081290694536694
+  },
+  "walk_forward": {
+    "train_days": 252,
+    "test_days": 21,
+    "top_k": 25,
+    "cost_bps": 5.0,
+    "initial_capital": 100000.0
+  },
+  "signal": {
+    "kind": "momentum",
+    "params": {
+      "lookback_days": 42
+    }
+  }
+}
