@@ -95,14 +95,32 @@ export interface BacktestSweepReport {
 }
 
 /**
+ * Two-run comparison: the same strategy on the survivors-only universe vs.
+ * point-in-time S&P 500 membership at each rebalance. The gap is the
+ * "joined-after" forward-looking bias — non-zero by construction.
+ */
+export interface PointInTimeComparison {
+  readonly raw: Pick<
+    BacktestMetrics,
+    "sharpe" | "annualized_return" | "max_drawdown" | "deflated_sharpe_p"
+  >
+  readonly pit: Pick<
+    BacktestMetrics,
+    "sharpe" | "annualized_return" | "max_drawdown" | "deflated_sharpe_p"
+  >
+}
+
+/**
  * Bundle of everything the Oracle results page needs to render. The page
  * receives this as a single static prop assembled at build time. `sweep`
- * is optional — missing sweep = page renders without the PBO panel,
- * never falls back to fabricated numbers.
+ * and `pitComparison` are optional — their absence does not break the
+ * build, but the page always renders the brutal-disclaimer block whether
+ * or not those diagnostics are present.
  */
 export interface OracleArtifacts {
   readonly report: BacktestReport
   readonly manifest: BacktestManifest
   readonly equityCurve: readonly EquityPoint[]
   readonly sweep: BacktestSweepReport | null
+  readonly pitComparison: PointInTimeComparison | null
 }

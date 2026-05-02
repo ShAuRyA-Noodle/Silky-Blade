@@ -150,6 +150,8 @@ class ConfigSnapshotOut(_Strict):
     walk_forward: ReportWalkForward
     signal: ReportSignal
     stats: ConfigStats
+    # Optional — older snapshots predate the field. New runs always include it.
+    universe: str | None = None
 
 
 # ---------------------------------------------------------------

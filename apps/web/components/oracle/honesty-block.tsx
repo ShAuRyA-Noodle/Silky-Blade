@@ -1,8 +1,16 @@
 import Link from "next/link"
 import { ArrowUpRight } from "lucide-react"
 
-import type { BacktestSweepReport } from "@/lib/oracle/types"
-import { formatRatio2, formatRatio3 } from "@/lib/oracle/format"
+import type {
+  BacktestSweepReport,
+  PointInTimeComparison,
+} from "@/lib/oracle/types"
+import {
+  formatPercent,
+  formatRatio2,
+  formatRatio3,
+  formatSharpe,
+} from "@/lib/oracle/format"
 
 interface HonestyBlockProps {
   /**
@@ -13,6 +21,12 @@ interface HonestyBlockProps {
    * artifact wasn't regenerated.
    */
   readonly sweep: BacktestSweepReport | null
+  /**
+   * Optional point-in-time-vs-raw comparison. When present, surfaces the
+   * actual size of the survivorship-bias premium hidden in the headline
+   * Sharpe.
+   */
+  readonly pitComparison: PointInTimeComparison | null
 }
 
 function pboReading(pbo: number): string {
@@ -22,7 +36,7 @@ function pboReading(pbo: number): string {
   return "Robust — the in-sample winner generally stays a winner out of sample."
 }
 
-export function HonestyBlock({ sweep }: HonestyBlockProps) {
+export function HonestyBlock({ sweep, pitComparison }: HonestyBlockProps) {
   const pbo = sweep?.pbo ?? null
 
   return (
@@ -82,20 +96,55 @@ export function HonestyBlock({ sweep }: HonestyBlockProps) {
             </div>
           )}
 
-          <div className="rounded-2xl border border-border/60 bg-card/30 backdrop-blur-xl p-6 md:p-8">
-            <dt className="text-[10px] md:text-[11px] font-mono uppercase tracking-[0.22em] text-muted-foreground">
-              Survivorship bias
-            </dt>
-            <dd className="mt-3 text-2xl md:text-3xl font-semibold tracking-[-0.02em] text-foreground">
-              Present, unfixed
-            </dd>
-            <p className="mt-4 text-sm md:text-base text-muted-foreground leading-relaxed">
-              The S&amp;P 500 daily snapshot used here only contains names that
-              survived to the dataset cut-off. Companies that went bust are
-              silently absent. Momentum on a survivors-only universe overstates
-              returns. Point-in-time membership history is a tracked gap.
-            </p>
-          </div>
+          {pitComparison ? (
+            <div className="rounded-2xl border border-primary/40 bg-card/50 backdrop-blur-xl p-6 md:p-8">
+              <dt className="text-[10px] md:text-[11px] font-mono uppercase tracking-[0.22em] text-muted-foreground">
+                Survivorship-bias premium
+              </dt>
+              <dd className="mt-3 text-4xl md:text-5xl font-semibold tracking-[-0.025em] text-primary tabular-nums">
+                −{formatSharpe(pitComparison.raw.sharpe - pitComparison.pit.sharpe)} Sharpe
+              </dd>
+              <p className="mt-4 text-sm md:text-base text-foreground leading-relaxed">
+                Same momentum strategy, two universes:
+              </p>
+              <dl className="mt-3 grid grid-cols-2 gap-3 text-[12px] md:text-[13px] font-mono">
+                <div>
+                  <dt className="text-muted-foreground">Survivors-only</dt>
+                  <dd className="text-foreground tabular-nums">
+                    Sharpe {formatSharpe(pitComparison.raw.sharpe)} ·{" "}
+                    {formatPercent(pitComparison.raw.annualized_return)} AnnRet
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Point-in-time S&amp;P 500</dt>
+                  <dd className="text-foreground tabular-nums">
+                    Sharpe {formatSharpe(pitComparison.pit.sharpe)} ·{" "}
+                    {formatPercent(pitComparison.pit.annualized_return)} AnnRet
+                  </dd>
+                </div>
+              </dl>
+              <p className="mt-3 text-[11px] md:text-xs font-mono text-muted-foreground/80 leading-relaxed">
+                Gap = the &ldquo;joined-after&rdquo; forward-looking bias in the
+                survivors-only dataset. Closing the &ldquo;exited-before&rdquo; gap
+                requires delisted-name price coverage (a tracked data gap).
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-border/60 bg-card/30 backdrop-blur-xl p-6 md:p-8">
+              <dt className="text-[10px] md:text-[11px] font-mono uppercase tracking-[0.22em] text-muted-foreground">
+                Survivorship bias
+              </dt>
+              <dd className="mt-3 text-2xl md:text-3xl font-semibold tracking-[-0.02em] text-foreground">
+                Present, unfixed
+              </dd>
+              <p className="mt-4 text-sm md:text-base text-muted-foreground leading-relaxed">
+                The S&amp;P 500 daily snapshot used here only contains names that
+                survived to the dataset cut-off. Companies that went bust are
+                silently absent. Momentum on a survivors-only universe overstates
+                returns. Point-in-time membership history is a tracked gap.
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="rounded-2xl border border-primary/30 bg-primary/5 backdrop-blur-xl p-6 md:p-8 mb-10">

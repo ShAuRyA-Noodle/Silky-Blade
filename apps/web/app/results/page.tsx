@@ -42,13 +42,14 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default function ResultsPage() {
-  const { report, manifest, equityCurve, sweep } = loadOracleArtifacts()
+  const { report, manifest, equityCurve, sweep, pitComparison } =
+    loadOracleArtifacts()
 
   return (
     <main id="oracle-results" className="relative">
       <OracleHero report={report} />
       <KpiGrid report={report} />
-      <HonestyBlock sweep={sweep} />
+      <HonestyBlock sweep={sweep} pitComparison={pitComparison} />
       <EquityCurve
         points={equityCurve}
         initialCapital={report.walk_forward.initial_capital}

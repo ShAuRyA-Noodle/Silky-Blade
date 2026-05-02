@@ -23,9 +23,11 @@ import type {
   BacktestSweepReport,
   EquityPoint,
   OracleArtifacts,
+  PointInTimeComparison,
 } from "./types"
 
 const RUN_NAME = "sp500_momentum_126"
+const PIT_RUN_NAME = "sp500_momentum_126_pit"
 const SWEEP_NAME = "sp500_momentum_sweep"
 
 const REGEN_HINT =
@@ -55,6 +57,19 @@ function sweepArtifactPath(file: string): string {
     "backtest",
     "artifacts",
     SWEEP_NAME,
+    file,
+  )
+}
+
+function pitArtifactPath(file: string): string {
+  return join(
+    process.cwd(),
+    "..",
+    "api",
+    "examples",
+    "backtest",
+    "artifacts",
+    PIT_RUN_NAME,
     file,
   )
 }
@@ -142,6 +157,48 @@ function validateManifest(manifest: BacktestManifest): void {
   }
 }
 
+function loadOptionalPitComparison(rawReport: BacktestReport): PointInTimeComparison | null {
+  // Optional. Absence does not break the build — the disclaimer paragraph
+  // covers the bias whether or not the comparison artifact is present.
+  const path = pitArtifactPath("report.json")
+  let raw: string
+  try {
+    raw = readFileSync(path, "utf8")
+  } catch {
+    return null
+  }
+  let pitReport: BacktestReport
+  try {
+    pitReport = JSON.parse(raw) as BacktestReport
+  } catch {
+    return null
+  }
+  const m = pitReport.metrics
+  if (
+    !Number.isFinite(m.sharpe) ||
+    !Number.isFinite(m.annualized_return) ||
+    !Number.isFinite(m.max_drawdown) ||
+    !Number.isFinite(m.deflated_sharpe_p)
+  ) {
+    return null
+  }
+  const r = rawReport.metrics
+  return {
+    raw: {
+      sharpe: r.sharpe,
+      annualized_return: r.annualized_return,
+      max_drawdown: r.max_drawdown,
+      deflated_sharpe_p: r.deflated_sharpe_p,
+    },
+    pit: {
+      sharpe: m.sharpe,
+      annualized_return: m.annualized_return,
+      max_drawdown: m.max_drawdown,
+      deflated_sharpe_p: m.deflated_sharpe_p,
+    },
+  }
+}
+
 function loadOptionalSweep(): BacktestSweepReport | null {
   // Sweep is optional — its absence does not break the build. PBO is a
   // diagnostic, not a contract. If the user hasn't run the sweep yet the
@@ -192,6 +249,7 @@ export function loadOracleArtifacts(): OracleArtifacts {
   }
   const equityCurve = parseEquityCurve(equityRaw)
   const sweep = loadOptionalSweep()
+  const pitComparison = loadOptionalPitComparison(report)
 
-  return { report, manifest, equityCurve, sweep }
+  return { report, manifest, equityCurve, sweep, pitComparison }
 }
