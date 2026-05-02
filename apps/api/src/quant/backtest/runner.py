@@ -38,7 +38,7 @@ import polars as pl
 
 from quant.backtest.engine import SignalProducer, WalkForwardConfig, walk_forward
 from quant.backtest.reproducibility import build_manifest
-from quant.backtest.signals import MomentumSignal
+from quant.backtest.signals import LowVolSignal, MeanReversionSignal, MomentumSignal
 from quant.backtest.statistics import deflated_sharpe_ratio, sharpe_ratio
 
 log = logging.getLogger("quant.backtest.runner")
@@ -134,8 +134,11 @@ def _as_date(v: Any) -> date:
 # ------------------------------------------------------------------
 def build_signal(spec: SignalSpec) -> SignalProducer:
     if spec.kind == "momentum":
-        lookback = int(spec.params.get("lookback_days", 126))
-        return MomentumSignal(lookback_days=lookback)
+        return MomentumSignal(lookback_days=int(spec.params.get("lookback_days", 126)))
+    if spec.kind == "low_vol":
+        return LowVolSignal(lookback_days=int(spec.params.get("lookback_days", 126)))
+    if spec.kind == "mean_reversion":
+        return MeanReversionSignal(lookback_days=int(spec.params.get("lookback_days", 5)))
     raise ValueError(f"unknown signal kind: {spec.kind!r}")
 
 

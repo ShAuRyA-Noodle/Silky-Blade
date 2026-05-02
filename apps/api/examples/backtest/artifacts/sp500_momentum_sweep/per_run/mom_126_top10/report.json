@@ -12,8 +12,8 @@
     "sharpe": 1.7525905714043657,
     "max_drawdown": 0.08311522292152808,
     "turnover": 16.8,
-    "deflated_sharpe_p": 0.9999162173590126,
-    "dsr_n_trials": 8,
+    "deflated_sharpe_p": 0.9994603622483215,
+    "dsr_n_trials": 13,
     "dsr_sharpes_std": 0.5,
     "return_skew": -0.02152980302825349,
     "return_kurtosis": 2.598770564008388

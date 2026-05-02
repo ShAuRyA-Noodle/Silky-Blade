@@ -18,7 +18,7 @@
     }
   },
   "stats": {
-    "n_trials": 8,
+    "n_trials": 13,
     "sharpes_std": 0.5
   }
 }

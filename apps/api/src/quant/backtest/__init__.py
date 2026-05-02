@@ -15,7 +15,7 @@ from quant.backtest.runner import (
     load_prices_csv,
     run_backtest,
 )
-from quant.backtest.signals import MomentumSignal
+from quant.backtest.signals import LowVolSignal, MeanReversionSignal, MomentumSignal
 from quant.backtest.statistics import (
     deflated_sharpe_ratio,
     probability_of_backtest_overfitting,
@@ -30,6 +30,8 @@ from quant.backtest.sweep import (
 
 __all__ = [
     "BacktestResult",
+    "LowVolSignal",
+    "MeanReversionSignal",
     "MomentumSignal",
     "ReproManifest",
     "RunConfig",

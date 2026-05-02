@@ -6,17 +6,17 @@
     "n_rebalances": 37
   },
   "metrics": {
-    "total_return": 0.8797866223008612,
+    "total_return": 0.8797866223008617,
     "annualized_return": 0.22715683811677323,
-    "annualized_vol": 0.13030971859322055,
-    "sharpe": 1.7432071879908981,
+    "annualized_vol": 0.13030971859322057,
+    "sharpe": 1.7432071879908977,
     "max_drawdown": 0.08265687689885305,
     "turnover": 15.060000000000002,
-    "deflated_sharpe_p": 0.9983905346032313,
-    "dsr_n_trials": 8,
+    "deflated_sharpe_p": 0.994820122228255,
+    "dsr_n_trials": 13,
     "dsr_sharpes_std": 0.5,
     "return_skew": -0.6830223285250617,
-    "return_kurtosis": 3.049868394897174
+    "return_kurtosis": 3.049868394897173
   },
   "walk_forward": {
     "train_days": 252,

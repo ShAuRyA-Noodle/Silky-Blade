@@ -1,0 +1,34 @@
+{
+  "name": "low_vol_252",
+  "window": {
+    "start": "2014-01-02",
+    "end": "2018-02-07",
+    "n_rebalances": 36
+  },
+  "metrics": {
+    "total_return": 0.24858702349989814,
+    "annualized_return": 0.07681130323842211,
+    "annualized_vol": 0.0891150979878976,
+    "sharpe": 0.8619336675010286,
+    "max_drawdown": 0.07295898471192483,
+    "turnover": 5.2600000000000025,
+    "deflated_sharpe_p": 0.6437094730048545,
+    "dsr_n_trials": 13,
+    "dsr_sharpes_std": 0.5,
+    "return_skew": -0.3156121758621992,
+    "return_kurtosis": 4.0730582041140115
+  },
+  "walk_forward": {
+    "train_days": 252,
+    "test_days": 21,
+    "top_k": 25,
+    "cost_bps": 5.0,
+    "initial_capital": 100000.0
+  },
+  "signal": {
+    "kind": "low_vol",
+    "params": {
+      "lookback_days": 252
+    }
+  }
+}

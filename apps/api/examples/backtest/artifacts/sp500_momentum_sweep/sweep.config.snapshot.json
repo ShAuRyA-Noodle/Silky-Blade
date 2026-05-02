@@ -73,6 +73,61 @@
       "stats_overrides": {}
     },
     {
+      "name": "low_vol_63",
+      "signal": {
+        "kind": "low_vol",
+        "params": {
+          "lookback_days": 63
+        }
+      },
+      "walk_forward_overrides": {},
+      "stats_overrides": {}
+    },
+    {
+      "name": "low_vol_126",
+      "signal": {
+        "kind": "low_vol",
+        "params": {
+          "lookback_days": 126
+        }
+      },
+      "walk_forward_overrides": {},
+      "stats_overrides": {}
+    },
+    {
+      "name": "low_vol_252",
+      "signal": {
+        "kind": "low_vol",
+        "params": {
+          "lookback_days": 252
+        }
+      },
+      "walk_forward_overrides": {},
+      "stats_overrides": {}
+    },
+    {
+      "name": "mean_rev_5",
+      "signal": {
+        "kind": "mean_reversion",
+        "params": {
+          "lookback_days": 5
+        }
+      },
+      "walk_forward_overrides": {},
+      "stats_overrides": {}
+    },
+    {
+      "name": "mean_rev_10",
+      "signal": {
+        "kind": "mean_reversion",
+        "params": {
+          "lookback_days": 10
+        }
+      },
+      "walk_forward_overrides": {},
+      "stats_overrides": {}
+    },
+    {
       "name": "mom_126_top10",
       "signal": {
         "kind": "momentum",

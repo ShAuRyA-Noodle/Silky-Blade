@@ -6,16 +6,16 @@
     "n_rebalances": 37
   },
   "metrics": {
-    "total_return": 0.6399456462312312,
+    "total_return": 0.6399456462312307,
     "annualized_return": 0.17401708635917768,
-    "annualized_vol": 0.13163590724934546,
-    "sharpe": 1.3219575873743443,
-    "max_drawdown": 0.1287059146925198,
+    "annualized_vol": 0.13163590724934549,
+    "sharpe": 1.3219575873743439,
+    "max_drawdown": 0.12870591469251985,
     "turnover": 21.900000000000002,
-    "deflated_sharpe_p": 0.9672002612300872,
-    "dsr_n_trials": 8,
+    "deflated_sharpe_p": 0.928269844288464,
+    "dsr_n_trials": 13,
     "dsr_sharpes_std": 0.5,
-    "return_skew": -0.4463087495844725,
+    "return_skew": -0.4463087495844721,
     "return_kurtosis": 5.702799195751864
   },
   "walk_forward": {

@@ -31,6 +31,7 @@ n_slices: 8
 # All runs must share train_days/test_days (cadence alignment for PBO).
 # top_k overrides are fine — those don't shift rebalance dates.
 runs:
+  # Momentum lookback grid
   - name: mom_42
     signal: { kind: momentum, params: { lookback_days: 42 } }
   - name: mom_63
@@ -41,6 +42,22 @@ runs:
     signal: { kind: momentum, params: { lookback_days: 189 } }
   - name: mom_252
     signal: { kind: momentum, params: { lookback_days: 252 } }
+
+  # Low-volatility anomaly (boring stocks beat high-flyers risk-adjusted)
+  - name: low_vol_63
+    signal: { kind: low_vol, params: { lookback_days: 63 } }
+  - name: low_vol_126
+    signal: { kind: low_vol, params: { lookback_days: 126 } }
+  - name: low_vol_252
+    signal: { kind: low_vol, params: { lookback_days: 252 } }
+
+  # Short-horizon mean reversion (recent losers tend to bounce)
+  - name: mean_rev_5
+    signal: { kind: mean_reversion, params: { lookback_days: 5 } }
+  - name: mean_rev_10
+    signal: { kind: mean_reversion, params: { lookback_days: 10 } }
+
+  # Cross-knob variants
   - name: mom_126_top10
     signal: { kind: momentum, params: { lookback_days: 126 } }
     walk_forward_overrides: { top_k: 10 }
