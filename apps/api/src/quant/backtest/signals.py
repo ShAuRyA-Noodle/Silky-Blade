@@ -102,6 +102,65 @@ def _neg_log_return_std(prices: list[float]) -> float:
 
 
 @dataclass(frozen=True)
+class MLPredictionsSignal:
+    """
+    Replay an ML trainer's out-of-fold predictions as a long-only signal.
+
+    The trainer artifact bundle written by `quant.ml.trainer.train` includes
+    `oof_predictions.csv` with columns `[date, symbol, prob_neg1, prob_zero,
+    prob_pos1, prob_*_calibrated, in_oof, pred_class]`. This signal loads
+    that file once at construction time, indexes by `(date, symbol)`, and on
+    each rebalance returns `score = P(+1) - P(-1)` for symbols with an
+    in-OOF prediction available at the as-of date.
+
+    The score is a long-short conviction; we use only the long side here
+    (top-k highest scores). Calibrated probabilities are preferred when
+    present — calibration is a property of the predictor, not the signal,
+    and using the calibrated columns is the honest default.
+
+    Why this is the bridge that closes the loop: the LightGBM model trained
+    on triple-barrier labels with purged K-fold CV + embargo is the central
+    ML claim in TRUST.md. Before this signal existed, that model never
+    produced a Sharpe number anyone could compare to the momentum baseline.
+    With it, the same walk-forward engine that prices the baseline also
+    prices the model — apples-to-apples.
+    """
+
+    predictions_csv: str
+    use_calibrated: bool = True
+
+    def __call__(self, as_of: date, history: pl.DataFrame) -> pl.DataFrame:
+        # `history` is unused — predictions were generated against the same
+        # price panel during training, so we trust them as-of `as_of`.
+        del history
+        oof = pl.read_csv(self.predictions_csv, try_parse_dates=True).with_columns(
+            pl.col("date").cast(pl.Date)
+        )
+        # Use the latest available prediction at or before `as_of`. The
+        # walk-forward engine rebalances at fixed cadences; the OOF panel
+        # has predictions only on label-anchor dates.
+        eligible = oof.filter((pl.col("date") <= as_of) & pl.col("in_oof"))
+        if eligible.is_empty():
+            return pl.DataFrame({"symbol": [], "score": []})
+
+        # Per symbol, take the most recent in-OOF prediction.
+        latest = eligible.sort(["symbol", "date"]).group_by("symbol", maintain_order=True).tail(1)
+
+        prob_pos = "prob_pos1_calibrated" if self.use_calibrated else "prob_pos1"
+        prob_neg = "prob_neg1_calibrated" if self.use_calibrated else "prob_neg1"
+        if prob_pos not in latest.columns or prob_neg not in latest.columns:
+            raise ValueError(
+                f"{self.predictions_csv}: missing columns {prob_pos}/{prob_neg} — "
+                "regenerate the artifact with the current trainer."
+            )
+
+        return latest.select(
+            pl.col("symbol"),
+            (pl.col(prob_pos) - pl.col(prob_neg)).alias("score"),
+        )
+
+
+@dataclass(frozen=True)
 class MeanReversionSignal:
     """
     Short-horizon reversal. Score = -trailing total return over lookback.
@@ -132,4 +191,4 @@ class MeanReversionSignal:
         return scores
 
 
-__all__ = ["LowVolSignal", "MeanReversionSignal", "MomentumSignal"]
+__all__ = ["LowVolSignal", "MLPredictionsSignal", "MeanReversionSignal", "MomentumSignal"]

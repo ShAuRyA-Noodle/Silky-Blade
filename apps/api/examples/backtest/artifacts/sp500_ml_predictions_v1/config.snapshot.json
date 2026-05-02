@@ -1,0 +1,26 @@
+{
+  "name": "sp500_ml_predictions_v1",
+  "prices_csv": "examples/backtest/sp500_5yr_adjusted.csv",
+  "start_date": "2014-12-01",
+  "end_date": "2018-02-07",
+  "output_dir": "examples/backtest/artifacts",
+  "walk_forward": {
+    "train_days": 252,
+    "test_days": 21,
+    "top_k": 25,
+    "cost_bps": 5.0,
+    "initial_capital": 100000.0
+  },
+  "signal": {
+    "kind": "ml_predictions",
+    "params": {
+      "predictions_csv": "examples/ml/artifacts/sp500_lightgbm_v1/oof_predictions.csv",
+      "use_calibrated": true
+    }
+  },
+  "stats": {
+    "n_trials": 1,
+    "sharpes_std": 0.5
+  },
+  "universe": "raw"
+}

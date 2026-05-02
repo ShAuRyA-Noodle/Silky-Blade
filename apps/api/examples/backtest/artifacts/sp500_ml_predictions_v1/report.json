@@ -1,0 +1,35 @@
+{
+  "name": "sp500_ml_predictions_v1",
+  "window": {
+    "start": "2014-12-01",
+    "end": "2018-02-07",
+    "n_rebalances": 26
+  },
+  "metrics": {
+    "total_return": 0.3808377106595151,
+    "annualized_return": 0.16059639716153784,
+    "annualized_vol": 0.11404319107389016,
+    "sharpe": 1.4082067999788361,
+    "max_drawdown": 0.08013600515601614,
+    "turnover": 19.140000000000004,
+    "deflated_sharpe_p": 0.999913014294369,
+    "dsr_n_trials": 1,
+    "dsr_sharpes_std": 0.5,
+    "return_skew": -0.7746940504574427,
+    "return_kurtosis": 3.9918352075098045
+  },
+  "walk_forward": {
+    "train_days": 252,
+    "test_days": 21,
+    "top_k": 25,
+    "cost_bps": 5.0,
+    "initial_capital": 100000.0
+  },
+  "signal": {
+    "kind": "ml_predictions",
+    "params": {
+      "predictions_csv": "examples/ml/artifacts/sp500_lightgbm_v1/oof_predictions.csv",
+      "use_calibrated": true
+    }
+  }
+}

@@ -73,6 +73,7 @@ apps/api/examples/backtest/artifacts/*
 !apps/api/examples/backtest/artifacts/sp500_momentum_126/
 !apps/api/examples/backtest/artifacts/sp500_momentum_126_pit/
 !apps/api/examples/backtest/artifacts/sp500_momentum_sweep/
+!apps/api/examples/backtest/artifacts/sp500_ml_predictions_v1/
 
 # ---- ML trainer derived artifacts ----
 # Same pattern — by default ignore, but if a committed demo bundle is

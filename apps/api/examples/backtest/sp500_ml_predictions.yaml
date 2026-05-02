@@ -1,0 +1,40 @@
+# Backtest using the trained LightGBM model's OOF predictions as the signal.
+# Closes the loop: TRUST.md claims a LightGBM multiclass model on triple-
+# barrier labels with purged K-fold CV; this run prices that exact model on
+# the same walk-forward engine that prices the momentum baseline.
+#
+# Universe note: the trainer downsampled to 100 random S&P 500 symbols for
+# memory boundedness, so this backtest's universe is that 100-symbol subset.
+# Comparing to the 505-symbol momentum result is informative but not strictly
+# apples-to-apples; for that, run momentum with the same symbol universe.
+#
+# Run:
+#   python -m quant.cli ml train examples/ml/sp500_lightgbm.yaml   # produce OOF predictions
+#   python -m quant.cli backtest run examples/backtest/sp500_ml_predictions.yaml
+
+name: sp500_ml_predictions_v1
+prices_csv: examples/backtest/sp500_5yr_adjusted.csv
+# Start a year after the OOF coverage begins so the engine has enough history
+# for warmup, and end at the OOF coverage's last in-OOF date.
+start_date: 2014-12-01
+end_date:   2018-02-07
+output_dir: examples/backtest/artifacts
+
+universe: raw   # signal already restricts to in-OOF symbols at each date
+
+walk_forward:
+  train_days: 252
+  test_days: 21
+  top_k: 25
+  cost_bps: 5.0
+  initial_capital: 100000.0
+
+signal:
+  kind: ml_predictions
+  params:
+    predictions_csv: examples/ml/artifacts/sp500_lightgbm_v1/oof_predictions.csv
+    use_calibrated: true
+
+stats:
+  n_trials: 1
+  sharpes_std: 0.5
