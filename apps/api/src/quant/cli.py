@@ -659,12 +659,23 @@ def paper_status(
 
 @paper_app.command("now")
 def paper_now(
-    signal_kind: Annotated[str, typer.Option(help="momentum | low_vol | mean_reversion")] = "momentum",
+    signal_kind: Annotated[
+        str,
+        typer.Option(help="momentum | low_vol | mean_reversion | ml_bundle"),
+    ] = "momentum",
     lookback_days: Annotated[int, typer.Option(help="Lookback for the signal AND for bar fetch")] = 126,
     top_k: Annotated[int, typer.Option(help="Number of positions to hold")] = 5,
     portfolio_value: Annotated[
         float, typer.Option(help="Override broker equity (default = use account)")
     ] = 0.0,
+    universe: Annotated[
+        str,
+        typer.Option(help="DEV (20 names) | SP500 (full index) | comma-separated symbols"),
+    ] = "DEV",
+    model_dir: Annotated[
+        str,
+        typer.Option(help="When --signal-kind ml_bundle, path to trainer artifact dir"),
+    ] = "",
     submit: Annotated[bool, typer.Option(help="Actually submit orders (otherwise plan-only)")] = False,
     confirm: Annotated[
         bool, typer.Option(help="Required alongside --submit before any order is sent")
@@ -686,9 +697,25 @@ def paper_now(
     for noisy in ("httpx", "httpcore"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
-    spec = SignalSpec(kind=signal_kind, params={"lookback_days": lookback_days})
+    if signal_kind == "ml_bundle":
+        if not model_dir:
+            raise typer.BadParameter("--signal-kind ml_bundle requires --model-dir")
+        spec = SignalSpec(kind="ml_bundle", params={"model_dir": model_dir})
+    else:
+        spec = SignalSpec(kind=signal_kind, params={"lookback_days": lookback_days})
     sig = build_signal(spec)
-    universe = list(DEV_UNIVERSE)
+
+    if universe == "DEV":
+        universe_list = list(DEV_UNIVERSE)
+    elif universe == "SP500":
+        from quant.universe.constituents import fetch_sp500
+
+        rows = _run(fetch_sp500())
+        universe_list = sorted({r["symbol"].strip() for r in rows if r.get("symbol", "").strip()})
+    else:
+        universe_list = [s.strip().upper() for s in universe.split(",") if s.strip()]
+    if not universe_list:
+        raise typer.BadParameter(f"empty universe resolved from {universe!r}")
 
     async def _go() -> None:
         from decimal import Decimal as _Decimal
@@ -699,7 +726,7 @@ def paper_now(
         try:
             result = await run_live_session(
                 signal=sig,
-                universe=universe,
+                universe=universe_list,
                 broker=broker,
                 broker_adapter=broker_adapter,
                 data_adapter=data_adapter,

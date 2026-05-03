@@ -130,7 +130,8 @@ async def test_fetch_recent_bars_returns_typed_frame() -> None:
     )
     df = await fetch_recent_bars(adapter, ["AAPL", "MSFT"], lookback_days=10)
     assert df.height == 3
-    assert set(df.columns) == {"date", "symbol", "adj_close"}
+    expected_cols = {"date", "symbol", "open", "high", "low", "close", "volume", "adj_close"}
+    assert set(df.columns) == expected_cols
     assert df["adj_close"].dtype == pl.Float64
     assert df.filter(pl.col("symbol") == "AAPL")["adj_close"].max() == 201.5
 
@@ -139,7 +140,8 @@ async def test_fetch_recent_bars_handles_empty_universe() -> None:
     adapter = _FakeDataAdapter(bars_resp={})
     df = await fetch_recent_bars(adapter, [], lookback_days=10)
     assert df.height == 0
-    assert set(df.columns) == {"date", "symbol", "adj_close"}
+    expected_cols = {"date", "symbol", "open", "high", "low", "close", "volume", "adj_close"}
+    assert set(df.columns) == expected_cols
 
 
 # ------------------------------------------------------------------

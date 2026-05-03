@@ -30,9 +30,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
+from typing import TYPE_CHECKING
 
 import numpy as np
 import polars as pl
+
+if TYPE_CHECKING:
+    from quant.ml.predict import ModelBundle
 
 
 @dataclass(frozen=True)
@@ -191,4 +195,49 @@ class MeanReversionSignal:
         return scores
 
 
-__all__ = ["LowVolSignal", "MLPredictionsSignal", "MeanReversionSignal", "MomentumSignal"]
+@dataclass(frozen=True)
+class MLBundleSignal:
+    """
+    Live ML signal — loads a trainer artifact bundle and runs calibrated
+    prediction on the price history at each rebalance. Score = P(+1)_cal -
+    P(-1)_cal, the same conviction the `recommend()` policy uses.
+
+    Loading is cached the first time the signal is called (the bundle is
+    immutable). For sweeps that score the same date many times, only one
+    load happens per `MLBundleSignal` instance.
+
+    Use this when you have a freshly trained model and want to backtest
+    or paper-trade against ITS recommendations directly — different from
+    `MLPredictionsSignal`, which only replays already-computed OOF probs.
+    """
+
+    model_dir: str
+
+    def __call__(self, as_of: date, history: pl.DataFrame) -> pl.DataFrame:
+        # Lazy import — predict.py drags in lightgbm + sklearn, which we
+        # don't want in the import path of the lightweight backtest CLI.
+        from quant.ml.predict import load_bundle, recommend
+
+        bundle = _bundle_cache.get(self.model_dir)
+        if bundle is None:
+            bundle = load_bundle(self.model_dir)
+            _bundle_cache[self.model_dir] = bundle
+
+        recs = recommend(bundle, history, as_of=as_of, threshold=0.0)
+        if not recs:
+            return pl.DataFrame({"symbol": [], "score": []})
+        return pl.DataFrame({"symbol": [r.symbol for r in recs], "score": [r.score for r in recs]})
+
+
+# Module-level cache so repeated calls with the same model_dir avoid the
+# heavy load+pickle path. Keyed by absolute model_dir string.
+_bundle_cache: dict[str, ModelBundle] = {}
+
+
+__all__ = [
+    "LowVolSignal",
+    "MLBundleSignal",
+    "MLPredictionsSignal",
+    "MeanReversionSignal",
+    "MomentumSignal",
+]

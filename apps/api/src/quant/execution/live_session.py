@@ -128,8 +128,18 @@ async def fetch_recent_bars(
     # 1.5x calendar days to cover weekends + holidays in the lookback window.
     start_dt = end_dt - timedelta(days=int(lookback_days * 1.5))
     syms = sorted({s.strip() for s in symbols if s and s.strip()})
+    empty_schema = {
+        "date": pl.Date,
+        "symbol": pl.String,
+        "open": pl.Float64,
+        "high": pl.Float64,
+        "low": pl.Float64,
+        "close": pl.Float64,
+        "volume": pl.Int64,
+        "adj_close": pl.Float64,
+    }
     if not syms:
-        return pl.DataFrame(schema={"date": pl.Date, "symbol": pl.String, "adj_close": pl.Float64})
+        return pl.DataFrame(schema=empty_schema)
 
     bars = await data_adapter.bars(syms, timeframe="1Day", start=start_dt, end=end_dt)
     if not isinstance(bars, dict):
@@ -143,21 +153,41 @@ async def fetch_recent_bars(
             if not isinstance(bar, dict):
                 continue
             ts = bar.get("t")
-            close = bar.get("c")
-            if ts is None or close is None:
+            c = bar.get("c")
+            if ts is None or c is None:
                 continue
-            # Alpaca returns ISO8601 timestamps; convert to date.
             try:
                 d = datetime.fromisoformat(str(ts).replace("Z", "+00:00")).date()
             except ValueError:
                 continue
-            rows.append({"date": d, "symbol": sym, "adj_close": float(close)})
+            # Alpaca's `adjustment="split"` returns split-adjusted values;
+            # treat `c` as both close and adj_close for downstream code.
+            rows.append(
+                {
+                    "date": d,
+                    "symbol": sym,
+                    "open": float(bar.get("o") or c),
+                    "high": float(bar.get("h") or c),
+                    "low": float(bar.get("l") or c),
+                    "close": float(c),
+                    "volume": int(bar.get("v") or 0),
+                    "adj_close": float(c),
+                }
+            )
 
     if not rows:
-        return pl.DataFrame(schema={"date": pl.Date, "symbol": pl.String, "adj_close": pl.Float64})
+        return pl.DataFrame(schema=empty_schema)
     return (
         pl.DataFrame(rows)
-        .with_columns(pl.col("date").cast(pl.Date), pl.col("adj_close").cast(pl.Float64))
+        .with_columns(
+            pl.col("date").cast(pl.Date),
+            pl.col("open").cast(pl.Float64),
+            pl.col("high").cast(pl.Float64),
+            pl.col("low").cast(pl.Float64),
+            pl.col("close").cast(pl.Float64),
+            pl.col("volume").cast(pl.Int64),
+            pl.col("adj_close").cast(pl.Float64),
+        )
         .sort(["symbol", "date"])
     )
 

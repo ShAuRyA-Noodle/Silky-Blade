@@ -41,6 +41,7 @@ from quant.backtest.reproducibility import build_manifest
 from quant.backtest.signals import (
     LowVolSignal,
     MeanReversionSignal,
+    MLBundleSignal,
     MLPredictionsSignal,
     MomentumSignal,
 )
@@ -156,6 +157,11 @@ def build_signal(spec: SignalSpec) -> SignalProducer:
             raise ValueError("ml_predictions signal requires params.predictions_csv (path)")
         use_cal = bool(spec.params.get("use_calibrated", True))
         return MLPredictionsSignal(predictions_csv=path, use_calibrated=use_cal)
+    if spec.kind == "ml_bundle":
+        model_dir = spec.params.get("model_dir")
+        if not isinstance(model_dir, str) or not model_dir:
+            raise ValueError("ml_bundle signal requires params.model_dir (path to artifact dir)")
+        return MLBundleSignal(model_dir=model_dir)
     raise ValueError(f"unknown signal kind: {spec.kind!r}")
 
 
