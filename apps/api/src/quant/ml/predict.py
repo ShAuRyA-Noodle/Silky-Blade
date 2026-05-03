@@ -55,6 +55,15 @@ class ModelBundle:
 
 
 @dataclass(frozen=True)
+class FeatureContribution:
+    """One feature's signed SHAP contribution to a single prediction."""
+
+    feature: str
+    value: float
+    contribution: float  # signed; positive pushes toward BUY, negative toward SELL
+
+
+@dataclass(frozen=True)
 class Recommendation:
     """Per-symbol recommendation with calibrated probabilities."""
 
@@ -66,6 +75,7 @@ class Recommendation:
     score: float  # P(+1) - P(-1), in [-1, 1]
     action: str  # "BUY" | "HOLD" | "SELL"
     confidence: str  # "low" | "medium" | "high"
+    top_drivers: list[FeatureContribution] | None = None  # top SHAP features
 
 
 # ------------------------------------------------------------------
@@ -138,6 +148,73 @@ def predict_calibrated(
     return apply_calibrators(raw_mean, bundle.calibrators)
 
 
+def shap_score_contributions(
+    bundle: ModelBundle,
+    feature_matrix: np.ndarray,
+) -> np.ndarray:
+    """
+    Per-row, per-feature TreeSHAP contributions to the BUY-minus-SELL score
+    (P(+1) - P(-1)) on the *raw* logit space, averaged across folds.
+
+    Returns (n_samples, n_features). Positive values push the symbol toward
+    BUY; negative values push toward SELL. Bias terms are dropped because
+    they are constants per fold and don't help interpretation.
+
+    Note: LightGBM's `pred_contrib=True` returns log-odds contributions for
+    each class. We compute pos_class_contrib - neg_class_contrib and
+    average across folds. This matches the score the recommendation
+    policy uses, modulo the calibration step (calibration is monotone in
+    each class score; signs of the contributions are preserved).
+    """
+    if feature_matrix.ndim != 2:
+        raise ValueError(f"feature_matrix must be 2-D, got shape {feature_matrix.shape}")
+    n_features = feature_matrix.shape[1]
+    accum = np.zeros((feature_matrix.shape[0], n_features), dtype=np.float64)
+    for booster in bundle.boosters:
+        contrib = booster.predict(
+            feature_matrix,
+            num_iteration=booster.best_iteration,
+            pred_contrib=True,
+        )
+        contrib_arr = np.asarray(contrib, dtype=np.float64)
+        # Reshape to (n_samples, n_classes, n_features+1).
+        n_classes = len(bundle.classes)
+        contrib_arr = contrib_arr.reshape(feature_matrix.shape[0], n_classes, n_features + 1)
+        # Drop the last column (bias) and take pos_class - neg_class.
+        contrib_no_bias = contrib_arr[:, :, :n_features]
+        diff = contrib_no_bias[:, _CLASS_POS, :] - contrib_no_bias[:, _CLASS_NEG, :]
+        accum += diff
+    return accum / len(bundle.boosters)
+
+
+def top_drivers(
+    contributions: np.ndarray,
+    feature_values: np.ndarray,
+    feature_names: list[str],
+    *,
+    k: int = 5,
+) -> list[list[FeatureContribution]]:
+    """
+    Per-row, top-K features ranked by |contribution| desc.
+    `contributions` and `feature_values` must be aligned (n_samples × n_features).
+    """
+    if contributions.shape != feature_values.shape:
+        raise ValueError(f"contribution shape {contributions.shape} != feature shape {feature_values.shape}")
+    out: list[list[FeatureContribution]] = []
+    for i in range(contributions.shape[0]):
+        order = np.argsort(-np.abs(contributions[i]))[:k]
+        row = [
+            FeatureContribution(
+                feature=feature_names[int(j)],
+                value=float(feature_values[i, int(j)]),
+                contribution=float(contributions[i, int(j)]),
+            )
+            for j in order
+        ]
+        out.append(row)
+    return out
+
+
 def features_as_of(
     prices: pl.DataFrame,
     *,
@@ -188,12 +265,17 @@ def recommend(
     as_of: date,
     symbols: list[str] | None = None,
     threshold: float = DEFAULT_DECISION_THRESHOLD,
+    explain: bool = False,
+    top_k_drivers: int = 5,
 ) -> list[Recommendation]:
     """
     Build features → predict calibrated probs → emit per-symbol recommendation.
 
+    When `explain=True`, each Recommendation gets a `top_drivers` list of
+    the K features whose SHAP contributions to the BUY-minus-SELL score
+    have the largest absolute magnitude.
+
     Symbols that fail the feature warmup at `as_of` are silently omitted.
-    Caller can compare returned `valid_symbols` to the input list to spot them.
     """
     X, valid_symbols = features_as_of(
         prices, as_of=as_of, feature_names=bundle.feature_names, symbols=symbols
@@ -202,6 +284,10 @@ def recommend(
         return []
 
     cal = predict_calibrated(bundle, X)
+    drivers_per_row: list[list[FeatureContribution]] | None = None
+    if explain:
+        contribs = shap_score_contributions(bundle, X)
+        drivers_per_row = top_drivers(contribs, X.astype(np.float64), bundle.feature_names, k=top_k_drivers)
 
     out: list[Recommendation] = []
     for i, sym in enumerate(valid_symbols):
@@ -225,6 +311,7 @@ def recommend(
                 score=score,
                 action=action,
                 confidence=_confidence_band(score),
+                top_drivers=drivers_per_row[i] if drivers_per_row is not None else None,
             )
         )
     return out
@@ -232,10 +319,13 @@ def recommend(
 
 __all__ = [
     "DEFAULT_DECISION_THRESHOLD",
+    "FeatureContribution",
     "ModelBundle",
     "Recommendation",
     "features_as_of",
     "load_bundle",
     "predict_calibrated",
     "recommend",
+    "shap_score_contributions",
+    "top_drivers",
 ]

@@ -286,6 +286,8 @@ def ml_predict(
     as_of: Annotated[str, typer.Option(help="YYYY-MM-DD; defaults to most recent date in the CSV")] = "",
     symbols: Annotated[str, typer.Option(help="Comma-separated symbols (default = all in panel)")] = "",
     threshold: Annotated[float, typer.Option(help="|score| threshold for BUY/SELL (else HOLD)")] = 0.10,
+    explain: Annotated[bool, typer.Option(help="Print top SHAP drivers per recommendation")] = False,
+    drivers_k: Annotated[int, typer.Option(help="Number of top features when --explain")] = 5,
     json_out: Annotated[str, typer.Option(help="Optional JSON output path")] = "",
 ) -> None:
     """
@@ -318,6 +320,8 @@ def ml_predict(
         as_of=target_date,
         symbols=sym_list,
         threshold=threshold,
+        explain=explain,
+        top_k_drivers=drivers_k,
     )
 
     typer.echo(f"# {len(recs)} recommendations as of {target_date} (threshold={threshold:.2f}):")
@@ -327,6 +331,12 @@ def ml_predict(
             f"  {r.symbol:<6} {r.action:<6} {r.confidence:<6} "
             f"{r.prob_neg1:.3f}  {r.prob_zero:.3f}  {r.prob_pos1:.3f}  {r.score:+.3f}"
         )
+        if explain and r.top_drivers:
+            for d in r.top_drivers:
+                arrow = "↑" if d.contribution > 0 else "↓"
+                typer.echo(
+                    f"      {arrow} {d.feature:<22} value={d.value:>+9.4f}  contrib={d.contribution:>+8.4f}"
+                )
     n_buy = sum(1 for r in recs if r.action == "BUY")
     n_sell = sum(1 for r in recs if r.action == "SELL")
     n_hold = sum(1 for r in recs if r.action == "HOLD")
@@ -335,23 +345,30 @@ def ml_predict(
     if json_out:
         from pathlib import Path as _Path
 
-        _Path(json_out).write_text(
-            json.dumps(
-                [
+        def _rec_payload(r: Any) -> dict[str, Any]:
+            base: dict[str, Any] = {
+                "symbol": r.symbol,
+                "as_of": r.as_of.isoformat(),
+                "action": r.action,
+                "confidence": r.confidence,
+                "score": r.score,
+                "prob_neg1": r.prob_neg1,
+                "prob_zero": r.prob_zero,
+                "prob_pos1": r.prob_pos1,
+            }
+            if r.top_drivers:
+                base["top_drivers"] = [
                     {
-                        "symbol": r.symbol,
-                        "as_of": r.as_of.isoformat(),
-                        "action": r.action,
-                        "confidence": r.confidence,
-                        "score": r.score,
-                        "prob_neg1": r.prob_neg1,
-                        "prob_zero": r.prob_zero,
-                        "prob_pos1": r.prob_pos1,
+                        "feature": d.feature,
+                        "value": d.value,
+                        "contribution": d.contribution,
                     }
-                    for r in recs
-                ],
-                indent=2,
-            ),
+                    for d in r.top_drivers
+                ]
+            return base
+
+        _Path(json_out).write_text(
+            json.dumps([_rec_payload(r) for r in recs], indent=2),
             encoding="utf-8",
         )
         typer.echo(f"# JSON written to {json_out}")
