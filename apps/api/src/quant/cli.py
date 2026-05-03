@@ -721,6 +721,10 @@ def paper_now(
         str,
         typer.Option(help="When --signal-kind ml_bundle, path to trainer artifact dir"),
     ] = "",
+    fundamentals_csv: Annotated[
+        str,
+        typer.Option(help="When --signal-kind value, path to fundamentals CSV"),
+    ] = "",
     submit: Annotated[bool, typer.Option(help="Actually submit orders (otherwise plan-only)")] = False,
     confirm: Annotated[
         bool, typer.Option(help="Required alongside --submit before any order is sent")
@@ -747,6 +751,10 @@ def paper_now(
         if not model_dir:
             raise typer.BadParameter("--signal-kind ml_bundle requires --model-dir")
         spec = SignalSpec(kind="ml_bundle", params={"model_dir": model_dir})
+    elif signal_kind == "value":
+        if not fundamentals_csv:
+            raise typer.BadParameter("--signal-kind value requires --fundamentals-csv")
+        spec = SignalSpec(kind="value", params={"fundamentals_csv": fundamentals_csv})
     else:
         spec = SignalSpec(kind=signal_kind, params={"lookback_days": lookback_days})
     sig = build_signal(spec)

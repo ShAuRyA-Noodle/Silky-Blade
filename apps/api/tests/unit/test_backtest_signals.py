@@ -22,6 +22,40 @@ def test_build_signal_low_vol() -> None:
     assert s.lookback_days == 30
 
 
+def test_build_signal_value(tmp_path: pytest.TempPathFactory) -> None:  # type: ignore[name-defined]
+    from quant.backtest.signals import ValueSignal
+
+    p = tmp_path / "fund.csv"  # type: ignore[union-attr]
+    p.write_text("symbol,price,pe,eps,market_cap,fetched_at_utc\nAAPL,200,30,6.5,1e12,2026-05-01\n")
+    s = build_signal(SignalSpec(kind="value", params={"fundamentals_csv": str(p)}))
+    assert isinstance(s, ValueSignal)
+
+
+def test_value_signal_inverse_pe(tmp_path: pytest.TempPathFactory) -> None:  # type: ignore[name-defined]
+    from datetime import date as _date
+
+    from quant.backtest.signals import ValueSignal
+
+    p = tmp_path / "fund.csv"  # type: ignore[union-attr]
+    p.write_text(
+        "symbol,price,pe,eps,market_cap,fetched_at_utc\n"
+        "CHEAP,10,5,2,1e9,2026-05-01\n"
+        "EXPENSIVE,500,50,10,1e12,2026-05-01\n"
+        "LOSS,1,-5,-0.2,1e8,2026-05-01\n"  # negative-earnings excluded
+    )
+    sig = ValueSignal(fundamentals_csv=str(p))
+    scores = sig(_date(2026, 5, 1), pl_empty_history())
+    got = {row["symbol"]: row["score"] for row in scores.iter_rows(named=True)}
+    assert "LOSS" not in got
+    assert got["CHEAP"] > got["EXPENSIVE"]  # 1/5 > 1/50
+    assert abs(got["CHEAP"] - 0.2) < 1e-9
+    assert abs(got["EXPENSIVE"] - 0.02) < 1e-9
+
+
+def pl_empty_history() -> pl.DataFrame:
+    return pl.DataFrame({"date": [], "symbol": [], "adj_close": []})
+
+
 def test_build_signal_mean_reversion() -> None:
     s = build_signal(SignalSpec(kind="mean_reversion", params={"lookback_days": 7}))
     assert isinstance(s, MeanReversionSignal)

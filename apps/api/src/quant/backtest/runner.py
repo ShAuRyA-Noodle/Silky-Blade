@@ -44,6 +44,7 @@ from quant.backtest.signals import (
     MLBundleSignal,
     MLPredictionsSignal,
     MomentumSignal,
+    ValueSignal,
 )
 from quant.backtest.statistics import deflated_sharpe_ratio, sharpe_ratio
 
@@ -162,6 +163,11 @@ def build_signal(spec: SignalSpec) -> SignalProducer:
         if not isinstance(model_dir, str) or not model_dir:
             raise ValueError("ml_bundle signal requires params.model_dir (path to artifact dir)")
         return MLBundleSignal(model_dir=model_dir)
+    if spec.kind == "value":
+        path = spec.params.get("fundamentals_csv")
+        if not isinstance(path, str) or not path:
+            raise ValueError("value signal requires params.fundamentals_csv")
+        return ValueSignal(fundamentals_csv=path)
     raise ValueError(f"unknown signal kind: {spec.kind!r}")
 
 

@@ -234,10 +234,43 @@ class MLBundleSignal:
 _bundle_cache: dict[str, ModelBundle] = {}
 
 
+@dataclass(frozen=True)
+class ValueSignal:
+    """
+    Earnings-yield value factor — score = 1 / P/E. Higher score = cheaper
+    relative to earnings = stronger long candidate by the value premium.
+
+    Reads a flat CSV produced by `scripts/fetch_fundamentals.py` (schema:
+    symbol, price, pe, eps, market_cap, fetched_at_utc). The fundamentals
+    snapshot is point-in-time at the moment of fetch — for backtests
+    pre-2025 you'd ideally want quarterly historical fundamentals, which
+    free FMP doesn't provide. For LIVE recommendations the snapshot is
+    accurate; that's the use case this signal is wired for.
+
+    Negative-earnings names (P/E < 0) are excluded — value-via-earnings
+    is undefined when there are no earnings to value against.
+    """
+
+    fundamentals_csv: str
+
+    def __call__(self, as_of: date, history: pl.DataFrame) -> pl.DataFrame:
+        del as_of, history  # value snapshot is current-only
+        df = pl.read_csv(self.fundamentals_csv)
+        if "symbol" not in df.columns or "pe" not in df.columns:
+            raise ValueError(f"{self.fundamentals_csv}: missing required columns symbol, pe")
+        return (
+            df.with_columns(pl.col("pe").cast(pl.Float64, strict=False))
+            .filter(pl.col("pe").is_finite() & (pl.col("pe") > 0))
+            .with_columns((1.0 / pl.col("pe")).alias("score"))
+            .select(["symbol", "score"])
+        )
+
+
 __all__ = [
     "LowVolSignal",
     "MLBundleSignal",
     "MLPredictionsSignal",
     "MeanReversionSignal",
     "MomentumSignal",
+    "ValueSignal",
 ]
