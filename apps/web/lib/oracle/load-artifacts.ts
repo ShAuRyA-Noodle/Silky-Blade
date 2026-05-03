@@ -23,10 +23,15 @@ import type {
   BacktestSweepReport,
   EquityPoint,
   OracleArtifacts,
+  PaperStatusSnapshot,
   PointInTimeComparison,
 } from "./types"
 
-const RUN_NAME = "sp500_momentum_126"
+// Headline run = the freshly-backfilled 2019-2026 momentum on Alpaca data.
+// PIT comparison + LightGBM run still point at the 2014-2018 Kaggle bundles
+// because those are the apples-to-apples comparisons that exist on disk.
+const RUN_NAME = "sp500_momentum_126_2026"
+const LEGACY_RAW_NAME = "sp500_momentum_126"
 const PIT_RUN_NAME = "sp500_momentum_126_pit"
 const ML_RUN_NAME = "sp500_ml_predictions_v1"
 const SWEEP_NAME = "sp500_momentum_sweep"
@@ -189,19 +194,30 @@ function tryLoadMetricsBundle(
 function loadOptionalPitComparison(
   rawReport: BacktestReport,
 ): PointInTimeComparison | null {
+  // For the survivorship-bias panel we want apples-to-apples: the Kaggle
+  // 2014-2018 raw run vs. the same window with PIT enforcement. The
+  // headline Sharpe (now 2019-2026) is shown elsewhere on the page.
+  const legacyRaw = tryLoadMetricsBundle(LEGACY_RAW_NAME)
   const pit = tryLoadMetricsBundle(PIT_RUN_NAME)
-  if (pit === null) return null
-  const r = rawReport.metrics
-  const ml = tryLoadMetricsBundle(ML_RUN_NAME)
-  const out: PointInTimeComparison = {
-    raw: {
-      sharpe: r.sharpe,
-      annualized_return: r.annualized_return,
-      max_drawdown: r.max_drawdown,
-      deflated_sharpe_p: r.deflated_sharpe_p,
-    },
-    pit,
+  if (legacyRaw === null || pit === null) {
+    // No legacy bundle — fall back to comparing the headline 2019-2026 run
+    // against PIT (still informative even if windows differ).
+    if (pit === null) return null
+    const r = rawReport.metrics
+    const ml = tryLoadMetricsBundle(ML_RUN_NAME)
+    const out: PointInTimeComparison = {
+      raw: {
+        sharpe: r.sharpe,
+        annualized_return: r.annualized_return,
+        max_drawdown: r.max_drawdown,
+        deflated_sharpe_p: r.deflated_sharpe_p,
+      },
+      pit,
+    }
+    return ml ? { ...out, ml } : out
   }
+  const ml = tryLoadMetricsBundle(ML_RUN_NAME)
+  const out: PointInTimeComparison = { raw: legacyRaw, pit }
   return ml ? { ...out, ml } : out
 }
 
@@ -256,6 +272,28 @@ export function loadOracleArtifacts(): OracleArtifacts {
   const equityCurve = parseEquityCurve(equityRaw)
   const sweep = loadOptionalSweep()
   const pitComparison = loadOptionalPitComparison(report)
+  const paperStatus = loadOptionalPaperStatus()
 
-  return { report, manifest, equityCurve, sweep, pitComparison }
+  return { report, manifest, equityCurve, sweep, pitComparison, paperStatus }
+}
+
+function loadOptionalPaperStatus(): PaperStatusSnapshot | null {
+  // Optional. Written by `quant paper status --json-out`. Sits inside the
+  // synced .oracle-artifacts directory so the Docker build picks it up.
+  for (const root of ARTIFACT_ROOTS) {
+    const candidate = join(root, "paper-status.json")
+    if (!existsSync(candidate)) continue
+    try {
+      const parsed = JSON.parse(readFileSync(candidate, "utf8")) as PaperStatusSnapshot
+      if (
+        typeof parsed.account?.equity === "string" &&
+        Array.isArray(parsed.positions)
+      ) {
+        return parsed
+      }
+    } catch {
+      // fall through
+    }
+  }
+  return null
 }

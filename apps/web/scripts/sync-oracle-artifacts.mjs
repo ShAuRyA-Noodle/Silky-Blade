@@ -29,6 +29,7 @@ const OUT_ROOT = join(WEB_ROOT, ".oracle-artifacts")
 const RUNS = [
   "sp500_momentum_126",
   "sp500_momentum_126_pit",
+  "sp500_momentum_126_2026",
   "sp500_ml_predictions_v1",
   "sp500_momentum_sweep",
 ]
