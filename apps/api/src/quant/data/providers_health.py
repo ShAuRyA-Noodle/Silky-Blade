@@ -218,10 +218,20 @@ async def _check_fmp(s: Settings) -> ProviderStatus:
 
         async with FmpAdapter() as a:
             t0 = asyncio.get_event_loop().time()
-            res = await a.key_metrics("AAPL", period="annual")
+            # /stable/quote/AAPL is on FMP's current free tier (post-2025
+            # endpoint reorganization); the older /api/v3/key-metrics path
+            # is paid-only.
+            res = await a.get_json("/stable/quote", params={"symbol": "AAPL"})
             ms = int((asyncio.get_event_loop().time() - t0) * 1000)
-        n = len(res) if isinstance(res, list) else 0
-        return ProviderStatus("fmp", True, True, f"key_metrics rows: {n}", ms)
+        ok = isinstance(res, list) and len(res) > 0
+        sym = res[0].get("symbol", "?") if ok else "?"
+        return ProviderStatus(
+            "fmp",
+            True,
+            ok,
+            f"quote.symbol={sym}" if ok else "unexpected shape",
+            ms,
+        )
     except Exception as exc:
         return ProviderStatus("fmp", True, False, f"{exc.__class__.__name__}: {exc}")
 
