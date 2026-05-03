@@ -1,0 +1,34 @@
+{
+  "name": "sp500_momentum_126_2026",
+  "window": {
+    "start": "2019-01-02",
+    "end": "2026-05-01",
+    "n_rebalances": 66
+  },
+  "metrics": {
+    "total_return": 6.009388059394452,
+    "annualized_return": 0.42482005365554953,
+    "annualized_vol": 0.24940667058530394,
+    "sharpe": 1.7033227405609803,
+    "max_drawdown": 0.19556568866050156,
+    "turnover": 25.7,
+    "deflated_sharpe_p": 1.0,
+    "dsr_n_trials": 1,
+    "dsr_sharpes_std": 0.5,
+    "return_skew": 0.00860525526630414,
+    "return_kurtosis": 2.0945397670919674
+  },
+  "walk_forward": {
+    "train_days": 252,
+    "test_days": 21,
+    "top_k": 25,
+    "cost_bps": 5.0,
+    "initial_capital": 100000.0
+  },
+  "signal": {
+    "kind": "momentum",
+    "params": {
+      "lookback_days": 126
+    }
+  }
+}

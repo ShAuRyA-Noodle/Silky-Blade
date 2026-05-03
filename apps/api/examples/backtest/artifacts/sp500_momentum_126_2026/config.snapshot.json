@@ -1,0 +1,25 @@
+{
+  "name": "sp500_momentum_126_2026",
+  "prices_csv": "../../data/raw/alpaca_sp500_2018_2026.csv",
+  "start_date": "2019-01-02",
+  "end_date": "2026-05-01",
+  "output_dir": "examples/backtest/artifacts",
+  "walk_forward": {
+    "train_days": 252,
+    "test_days": 21,
+    "top_k": 25,
+    "cost_bps": 5.0,
+    "initial_capital": 100000.0
+  },
+  "signal": {
+    "kind": "momentum",
+    "params": {
+      "lookback_days": 126
+    }
+  },
+  "stats": {
+    "n_trials": 1,
+    "sharpes_std": 0.5
+  },
+  "universe": "raw"
+}

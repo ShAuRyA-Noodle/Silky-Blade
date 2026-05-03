@@ -72,13 +72,14 @@ apps/web/.oracle-artifacts/
 apps/api/examples/backtest/artifacts/*
 !apps/api/examples/backtest/artifacts/sp500_momentum_126/
 !apps/api/examples/backtest/artifacts/sp500_momentum_126_pit/
+!apps/api/examples/backtest/artifacts/sp500_momentum_126_2026/
 !apps/api/examples/backtest/artifacts/sp500_momentum_sweep/
 !apps/api/examples/backtest/artifacts/sp500_momentum_sweep_pit/
 !apps/api/examples/backtest/artifacts/sp500_ml_predictions_v1/
 
 # ---- ML trainer derived artifacts ----
-# Same pattern — by default ignore, but if a committed demo bundle is
-# added later, force-track its directory with a !rule.
+# 36MB+ per run (OOF predictions CSV + feature importances + booster).
+# Tracked via MLflow rather than git; not committed.
 apps/api/examples/ml/artifacts/
 
 # ---- Models (tracked via MLflow) ----
