@@ -299,16 +299,68 @@ Real ML output, 2026-05-01, full 503-name SP500 panel:
 | Audit ref | Severity | Why deferred |
 |---|---|---|
 | §1.5 exited-and-removed survivorship | 🔴 | Needs paid feed (Sharadar/Norgate $50-200/mo). Outside zero-budget scope. |
-| §1.4 hyperparameter tuning | 🟠 | Lots of compute; opt-in feature for a workstation, not a laptop. |
-| §1.4 max_symbols memory cap | 🟠 | Same — needs more RAM than the operator's laptop. |
-| §1.3 fundamental signals (P/E etc.) | 🟠 | FMP keys work; building Value + Quality factors is a real-but-meaty next-sprint item. |
-| §1.4 SHAP per-prediction | 🟡 | Single-purpose; build when a user actually wants explainability. |
-| §1.4 model registry promote-to-prod | 🟡 | Manual MLflow promotion is fine for a single-operator project. |
-| §1.8 daily worker / scheduler | 🟠 | Prefect flow exists in repo skeleton; wiring it up to call `paper now --submit --confirm` on a cron is the next ship after this pass. |
-| §1.9 SSE/WebSocket live updates | 🟠 | Module exists in `quant.streaming`; not wired to paper. |
+| §1.4 max_symbols memory cap | 🟡 | 200-symbol cap holds peak under 2GB on the M2 Air; full 503 is doable but tight, opt-in via config edit. |
+| §1.9 SSE/WebSocket live updates | 🟡 | Daily-rebalance strategy doesn't need tick-level UI; deferred. |
 | §1.9 write endpoints for paper | 🟠 | Refused by design — submission stays on the CLI behind triple-confirm. |
+| §1.4 model registry promote-to-prod | 🟡 | Manual MLflow promotion is fine for a single-operator project. |
 
 The remaining 🔴 (delisted-name coverage) is the only item where the
 "can't fix without budget" framing genuinely applies; everything else is
 "could fix in a day if it became the priority". This audit's note that
 "AUDIT.md should be updated as gaps close" is itself now closed.
+
+---
+
+## 7. 2026-05-03 second gap-closure pass
+
+Five more ships landed this session; the platform is now genuinely
+"watchable from a phone for 7-8 months" without operator intervention.
+
+### Closed in this pass
+
+| Audit ref | Severity | Ship | Commit |
+|---|---|---|---|
+| §1.8 daily worker / scheduler | 🟠 | GitHub Actions cron `daily-paper.yml` runs every weekday 21:30 UTC, calls `quant paper status` with `--json-out` + `--history-csv`, commits both into `apps/web/.oracle-artifacts/` so Vercel rebuilds /paper on push. Free tier — no infra to pay for. | `14e156c` |
+| §1.10 no equity-history view | 🟠 | `quant paper status --history-csv <path>` appends one row per call (timestamp, equity, cash, buying_power, status, n_positions). `/paper` page renders an SVG equity chart from the CSV when ≥2 points exist. Mobile-readable. | `14e156c` |
+| §1.4 SHAP per-prediction | 🟡 | `quant.ml.predict.shap_score_contributions` via LightGBM TreeSHAP (`pred_contrib=True`). `recommend(explain=True)` attaches top-K signed FeatureContribution per row. `quant ml predict --explain` prints them. Real output: CTSH BUY top driver `gap_overnight +0.26`, FICO SELL top driver `vol_21d −0.24`. | `a625637` |
+| §1.3 fundamental signals (P/E) | 🟠 | `ValueSignal(fundamentals_csv)` ranks symbols by 1/PE (earnings yield). `scripts/fetch_fundamentals.py` pulls P/E from Finnhub `/stock/metric` (free, 60/min). FMP `/stable/quote` gates P/E behind premium tier — Finnhub used instead. `quant paper now --signal-kind value --fundamentals-csv …` works end-to-end. | `88e79ad` |
+| §1.4 hyperparameter tuning | 🟠 | `quant.ml.tune.tune(cfg, n_trials)` via Optuna TPE. Sweeps learning_rate / num_leaves / min_data_in_leaf / feature_fraction / bagging_fraction / lambda_l1+l2 / num_boost_round. `quant ml tune <config> --n-trials 30` is the operator-facing CLI. ~25s per trial on M2 Air, ~12-15min for 30 trials. | `166f946` |
+
+### Real numbers added in this pass
+
+| Run / signal | Result |
+|---|---|
+| Live SHAP on sp500_lightgbm_2026 | CTSH BUY (+0.377): `gap_overnight +0.26`, `atr_14 +0.16`, `ret_63d +0.13` |
+| Value signal on DEV universe | Cheapest by 1/P/E: **JPM (P/E 14.77)**, JNJ, PG, XOM, HD; most expensive TSLA (P/E 386.88) |
+| Optuna 3-trial smoke | best logloss 0.9862 (parameter sample written to JSON) |
+| Daily cron | Bootstrap row in paper-history.csv: $100k @ 2026-05-03 |
+
+### Now-remaining gaps
+
+| Severity | Item | Why deferred |
+|---|---|---|
+| 🔴 | Delisted-name survivorship coverage | Genuinely needs paid feed ($50-200/mo). |
+| 🟡 | max_symbols memory cap | 200 holds peak ≤2GB on M2 Air 8GB; full 503 works but tight. |
+| 🟡 | SSE/WebSocket live updates | Daily-rebalance UX doesn't need tick-level pushes; deferred until a use-case actually demands it. |
+| 🟠 | Write endpoints for paper trading | Refused by design — submission stays CLI-gated behind TRADING_ENABLED + ALPACA_PAPER + --confirm. |
+| 🟡 | Model registry / promote-to-prod | Manual MLflow promotion fine for single-operator. |
+
+### Ready-to-trade checklist
+
+To start a 7-8 month live paper-trading track record:
+
+1. **GitHub repo secrets** (Settings → Secrets → Actions):
+   `ALPACA_API_KEY_ID`, `ALPACA_API_SECRET_KEY`, `JWT_SECRET_KEY`,
+   `POLYGON_API_KEY`, `FRED_API_KEY`, `TIINGO_API_KEY`, `GROQ_API_KEY`.
+2. **Repo variable**: `TRADING_ENABLED=true` (or leave default `false`
+   for status-only cron).
+3. **Vercel deploy**: connect the repo, set root directory to
+   `apps/web`, deploy. Vercel auto-rebuilds on every push, including
+   the cron's daily snapshot commit.
+4. **Phone**: hit the Vercel URL `/paper` — see equity, positions,
+   daily-snapshot chart. No app, no login.
+
+The cron will commit one row per weekday for the next 7-8 months. The
+chart on /paper grows. After ~6 months the operator can compare the
+live realized Sharpe to the backtest-claimed Sharpe and either trust
+the model going forward or kill the strategy with evidence.
