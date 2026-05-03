@@ -691,6 +691,7 @@ def paper_now(
     from quant.backtest.runner import SignalSpec, build_signal
     from quant.execution.broker import AlpacaBroker
     from quant.execution.live_session import run_live_session
+    from quant.execution.risk_gate import RiskLimits
     from quant.universe.constituents import DEV_UNIVERSE
 
     _setup_logging()
@@ -724,6 +725,12 @@ def paper_now(
         data_adapter = AlpacaDataAdapter()
         broker = AlpacaBroker()
         try:
+            risk_limits = RiskLimits(
+                max_position_pct=settings.max_position_pct,
+                max_positions=settings.max_positions,
+                daily_loss_limit_pct=settings.daily_loss_limit_pct,
+                drawdown_kill_pct=settings.drawdown_kill_pct,
+            )
             result = await run_live_session(
                 signal=sig,
                 universe=universe_list,
@@ -736,6 +743,7 @@ def paper_now(
                 trading_enabled=settings.trading_enabled,
                 alpaca_paper=settings.alpaca_paper,
                 confirm=confirm and submit,
+                risk_limits=risk_limits,
             )
         finally:
             await broker_adapter.aclose()
@@ -757,6 +765,12 @@ def paper_now(
                 f"  {p.side:<4} {p.symbol:<6} qty={p.quantity:<5}  "
                 f"target=${p.target_value}  current=${p.current_value}"
             )
+        n_blocked = sum(1 for r in result.risk_results if not r.accepted)
+        if n_blocked:
+            typer.echo(f"# RISK GATE blocked {n_blocked} proposals:")
+            for r in result.risk_results:
+                if not r.accepted:
+                    typer.echo(f"  BLOCK {r.proposal.side} {r.proposal.symbol}: {r.reason}")
         if result.submitted:
             typer.echo(f"# SUBMITTED {len(result.acks)} orders to Alpaca paper broker")
             for ack in result.acks:

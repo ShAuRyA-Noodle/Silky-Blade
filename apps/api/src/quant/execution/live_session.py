@@ -44,6 +44,12 @@ from quant.execution.paper_session import (
     compute_target_orders,
     submit_orders,
 )
+from quant.execution.risk_gate import (
+    AccountState,
+    RiskCheckResult,
+    RiskLimits,
+    apply_risk_gate,
+)
 
 log = logging.getLogger("quant.execution.live_session")
 
@@ -69,6 +75,7 @@ class LiveSessionResult:
     proposals: list[ProposedOrder]
     submitted: bool
     acks: list[BrokerOrderAck] = field(default_factory=list)
+    risk_results: list[RiskCheckResult] = field(default_factory=list)
 
 
 # ------------------------------------------------------------------
@@ -225,6 +232,8 @@ async def run_live_session(
     alpaca_paper: bool = True,
     confirm: bool = False,
     session_id: str | None = None,
+    risk_limits: RiskLimits | None = None,
+    peak_equity: Decimal | None = None,
 ) -> LiveSessionResult:
     """
     Pull positions + bars → score signal → compute orders → maybe submit.
@@ -281,6 +290,26 @@ async def run_live_session(
         latest_prices=latest_prices,
     )
 
+    # Pre-trade risk gate. When `risk_limits` is None we skip the check —
+    # callers that want backtest-equivalent (no caps) behavior can pass
+    # None; production callers always pass the live limits from settings.
+    risk_results: list[RiskCheckResult] = []
+    accepted_proposals: list[ProposedOrder] = proposals
+    if risk_limits is not None:
+        risk_results = apply_risk_gate(
+            proposals,
+            account=AccountState(equity=account.equity, peak_equity=peak_equity),
+            limits=risk_limits,
+            n_existing_positions=len(current_positions),
+        )
+        accepted_proposals = [r.proposal for r in risk_results if r.accepted]
+        n_blocked = sum(1 for r in risk_results if not r.accepted)
+        if n_blocked > 0:
+            log.warning("risk gate blocked %d/%d proposals", n_blocked, len(proposals))
+            for r in risk_results:
+                if not r.accepted:
+                    log.warning("  BLOCK %s %s: %s", r.proposal.side, r.proposal.symbol, r.reason)
+
     allow, reason = _safety_gate(
         trading_enabled=trading_enabled,
         alpaca_paper=alpaca_paper,
@@ -288,16 +317,20 @@ async def run_live_session(
     )
     submitted = False
     acks: list[BrokerOrderAck] = []
-    if allow and proposals:
+    if allow and accepted_proposals:
         log.warning(
             "submitting %d orders via paper broker (gates open: %s)",
-            len(proposals),
+            len(accepted_proposals),
             reason,
         )
-        acks = await submit_orders(broker, proposals, session_id=sid)
+        acks = await submit_orders(broker, accepted_proposals, session_id=sid)
         submitted = True
     else:
-        log.info("plan-only mode (%s); %d proposals not submitted", reason, len(proposals))
+        log.info(
+            "plan-only mode (%s); %d proposals not submitted",
+            reason,
+            len(accepted_proposals),
+        )
 
     return LiveSessionResult(
         session_id=sid,
@@ -308,12 +341,14 @@ async def run_live_session(
         proposals=proposals,
         submitted=submitted,
         acks=acks,
+        risk_results=risk_results,
     )
 
 
 __all__ = [
     "AccountSnapshot",
     "LiveSessionResult",
+    "RiskLimits",
     "fetch_account_snapshot",
     "fetch_current_positions",
     "fetch_recent_bars",

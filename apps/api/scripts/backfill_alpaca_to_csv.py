@@ -76,9 +76,10 @@ async def main() -> None:
             w = csv.writer(fh)
             w.writerow(["date", "symbol", "open", "high", "low", "close", "volume", "adj_close"])
 
+            n_batches = (len(symbols) + args.batch - 1) // args.batch
             for i in range(0, len(symbols), args.batch):
                 batch = symbols[i : i + args.batch]
-                log.info("batch %d/%d (%d symbols)", i // args.batch + 1, (len(symbols) + args.batch - 1) // args.batch, len(batch))
+                log.info("batch %d/%d (%d symbols)", i // args.batch + 1, n_batches, len(batch))
                 try:
                     bars: dict[str, list[dict[str, Any]]] = await a.bars(
                         batch,
@@ -87,7 +88,7 @@ async def main() -> None:
                         end=end_dt,
                         adjustment="split",
                     )
-                except Exception as exc:  # noqa: BLE001
+                except Exception as exc:
                     failed_batches += 1
                     log.warning("batch failed: %s — %s", batch[:3], exc)
                     continue
