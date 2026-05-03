@@ -44,6 +44,7 @@ from quant.execution.paper_session import (
     compute_target_orders,
     submit_orders,
 )
+from quant.execution.reconciliation import FillReport, reconcile
 from quant.execution.risk_gate import (
     AccountState,
     RiskCheckResult,
@@ -76,6 +77,7 @@ class LiveSessionResult:
     submitted: bool
     acks: list[BrokerOrderAck] = field(default_factory=list)
     risk_results: list[RiskCheckResult] = field(default_factory=list)
+    fills: list[FillReport] = field(default_factory=list)
 
 
 # ------------------------------------------------------------------
@@ -234,6 +236,8 @@ async def run_live_session(
     session_id: str | None = None,
     risk_limits: RiskLimits | None = None,
     peak_equity: Decimal | None = None,
+    reconcile_max_polls: int = 30,
+    reconcile_interval_seconds: float = 1.0,
 ) -> LiveSessionResult:
     """
     Pull positions + bars → score signal → compute orders → maybe submit.
@@ -317,6 +321,7 @@ async def run_live_session(
     )
     submitted = False
     acks: list[BrokerOrderAck] = []
+    fills: list[FillReport] = []
     if allow and accepted_proposals:
         log.warning(
             "submitting %d orders via paper broker (gates open: %s)",
@@ -325,6 +330,17 @@ async def run_live_session(
         )
         acks = await submit_orders(broker, accepted_proposals, session_id=sid)
         submitted = True
+        # Reconcile every submitted order to a terminal state. With ~10
+        # orders and ~1s polling, this completes in seconds in liquid
+        # market hours and ~30s out-of-hours (orders sit in 'accepted'
+        # until the next session opens).
+        log.info("reconciling %d orders…", len(acks))
+        fills = await reconcile(
+            broker_adapter,
+            acks,
+            max_polls=reconcile_max_polls,
+            interval_seconds=reconcile_interval_seconds,
+        )
     else:
         log.info(
             "plan-only mode (%s); %d proposals not submitted",
@@ -342,6 +358,7 @@ async def run_live_session(
         submitted=submitted,
         acks=acks,
         risk_results=risk_results,
+        fills=fills,
     )
 
 

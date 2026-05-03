@@ -200,6 +200,8 @@ async def test_run_live_session_submits_when_all_gates_open() -> None:
         trading_enabled=True,
         alpaca_paper=True,
         confirm=True,
+        reconcile_max_polls=1,  # don't actually loop in tests
+        reconcile_interval_seconds=0.0,
     )
     assert result.submitted is True
     assert "UP" in result.target_weights
