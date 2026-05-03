@@ -2,7 +2,11 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { ArrowUpRight } from "lucide-react"
 
-import { loadOraclePaperSnapshot } from "@/lib/oracle/load-paper"
+import { PaperEquityChart } from "@/components/oracle/paper-equity-chart"
+import {
+  loadOraclePaperHistory,
+  loadOraclePaperSnapshot,
+} from "@/lib/oracle/load-paper"
 
 // Build-time read of `.oracle-artifacts/paper-status.json`. The file is
 // produced by `quant paper status --json-out`. If absent the page renders
@@ -30,6 +34,7 @@ function fmtPct(s: string): string {
 
 export default function PaperPage() {
   const snapshot = loadOraclePaperSnapshot()
+  const history = loadOraclePaperHistory()
 
   return (
     <main id="oracle-paper" className="relative">
@@ -84,6 +89,22 @@ export default function PaperPage() {
               </dl>
             </div>
           </section>
+
+          {history.length >= 2 && (
+            <section className="relative px-6 py-12 md:py-16 border-t border-border/40">
+              <div className="container mx-auto max-w-6xl">
+                <div className="text-[11px] font-mono tracking-[0.3em] uppercase text-primary mb-6">
+                  Equity over time · {history.length} snapshots
+                </div>
+                <PaperEquityChart points={history} />
+                <p className="mt-4 text-[11px] md:text-xs font-mono text-muted-foreground/80 leading-relaxed">
+                  Daily snapshot written by the GitHub Actions cron job
+                  (apps/api: <code className="text-primary">quant paper status --history-csv apps/web/.oracle-artifacts/paper-history.csv</code>).
+                  Past performance does not predict future returns.
+                </p>
+              </div>
+            </section>
+          )}
 
           <section className="relative px-6 py-12 md:py-16 border-t border-border/40">
             <div className="container mx-auto max-w-6xl">

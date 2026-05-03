@@ -66,6 +66,9 @@ data/legacy/*
 apps/api/examples/backtest/sp500_5yr_adjusted.csv
 # Synced into the web Docker build context by `npm run sync-artifacts`.
 apps/web/.oracle-artifacts/
+# Daily-cron-produced files are tracked so Vercel rebuilds pick them up.
+!apps/web/.oracle-artifacts/paper-status.json
+!apps/web/.oracle-artifacts/paper-history.csv
 # By default, artifacts are gitignored (regenerable). Force-track the
 # specific demo bundles so the web build + CI have real, committed numbers
 # without needing the 28MB source dataset to regenerate.

@@ -1,0 +1,84 @@
+name: Daily paper-trading rebalance
+
+# Runs every weekday at 21:30 UTC (~5:30 PM ET, after US market close).
+# Pulls latest Alpaca paper account state, runs the ML model, optionally
+# submits paper orders, snapshots the result, appends to the equity-history
+# CSV, and commits both back to the repo. Vercel rebuilds the /paper
+# page on push so the operator's phone shows yesterday's state.
+#
+# Required secrets (Settings → Secrets and variables → Actions):
+#   ALPACA_API_KEY_ID, ALPACA_API_SECRET_KEY  (paper account)
+#   POLYGON_API_KEY, FRED_API_KEY, TIINGO_API_KEY,
+#   GROQ_API_KEY, FINNHUB_API_KEY, MARKETAUX_API_KEY,
+#   NEWSAPI_KEY, FMP_API_KEY, ALPHAVANTAGE_API_KEY,
+#   NASDAQ_DATA_LINK_API_KEY  (any subset; only Alpaca is required)
+#   JWT_SECRET_KEY            (Settings validator requires non-empty)
+#
+# Optional vars:
+#   TRADING_ENABLED           ("true" to actually submit; otherwise plan-only)
+
+on:
+  schedule:
+    - cron: "30 21 * * 1-5"
+  workflow_dispatch: # manual trigger from the Actions UI
+
+permissions:
+  contents: write # for the auto-commit of paper-history.csv
+
+jobs:
+  paper-rebalance:
+    name: Refresh paper account snapshot + (optional) rebalance
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        run: pip install uv==0.5.11
+
+      - name: Install dependencies
+        run: uv pip install --system -e ".[dev]"
+
+      - name: Refresh snapshot + history
+        env:
+          APP_ENV: development
+          JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+          ALPACA_API_KEY_ID: ${{ secrets.ALPACA_API_KEY_ID }}
+          ALPACA_API_SECRET_KEY: ${{ secrets.ALPACA_API_SECRET_KEY }}
+          ALPACA_PAPER: "true"
+          ALPACA_BASE_URL: "https://paper-api.alpaca.markets"
+          ALPACA_DATA_URL: "https://data.alpaca.markets"
+          POLYGON_API_KEY: ${{ secrets.POLYGON_API_KEY }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          TIINGO_API_KEY: ${{ secrets.TIINGO_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          TRADING_ENABLED: ${{ vars.TRADING_ENABLED || 'false' }}
+          MLFLOW_TRACKING_URI: file:///tmp/mlruns
+        run: |
+          mkdir -p ../web/.oracle-artifacts
+          python -m quant.cli paper status \
+            --json-out ../web/.oracle-artifacts/paper-status.json \
+            --history-csv ../web/.oracle-artifacts/paper-history.csv
+
+      - name: Commit snapshot + history
+        run: |
+          cd ../..
+          git config user.name "oracle-paper-bot"
+          git config user.email "actions@github.com"
+          git add apps/web/.oracle-artifacts/paper-status.json apps/web/.oracle-artifacts/paper-history.csv || true
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "paper: daily snapshot $(date -u +%Y-%m-%d)"
+            git push
+          fi

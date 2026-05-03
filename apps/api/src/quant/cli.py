@@ -575,6 +575,10 @@ def data_verify(
 @paper_app.command("status")
 def paper_status(
     json_out: Annotated[str, typer.Option(help="Optional path to write the JSON state")] = "",
+    history_csv: Annotated[
+        str,
+        typer.Option(help="Append today's snapshot to this CSV (creates if missing)"),
+    ] = "",
 ) -> None:
     """
     Read the live Alpaca paper account state — equity, cash, buying power,
@@ -653,6 +657,30 @@ def paper_status(
             }
             _Path(json_out).write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
             typer.echo(f"# JSON written to {json_out}")
+
+        if history_csv:
+            import csv as _csv
+            from datetime import UTC as _UTC
+            from datetime import datetime as _datetime
+            from pathlib import Path as _Path
+
+            row = {
+                "timestamp": _datetime.now(_UTC).isoformat(),
+                "equity": str(snap.equity),
+                "cash": str(snap.cash),
+                "buying_power": str(snap.buying_power),
+                "status": snap.status,
+                "n_positions": str(len(positions)),
+            }
+            history_path = _Path(history_csv)
+            history_path.parent.mkdir(parents=True, exist_ok=True)
+            new_file = not history_path.exists()
+            with history_path.open("a", newline="", encoding="utf-8") as fh:
+                w = _csv.DictWriter(fh, fieldnames=list(row.keys()))
+                if new_file:
+                    w.writeheader()
+                w.writerow(row)
+            typer.echo(f"# history row appended to {history_csv}")
 
     _run(_go())
 
