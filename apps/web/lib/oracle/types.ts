@@ -120,11 +120,34 @@ export interface PointInTimeComparison {
 }
 
 /**
+ * Optional paper-trading snapshot. Written to disk by
+ * `quant paper status --json-out`; surfaced read-only on /results when
+ * present. Decimal fields are JSON strings to preserve precision.
+ */
+export interface PaperPosition {
+  readonly symbol: string
+  readonly quantity: string
+  readonly last_price: string
+  readonly raw: Readonly<Record<string, unknown>>
+}
+
+export interface PaperStatusSnapshot {
+  readonly account: {
+    readonly equity: string
+    readonly cash: string
+    readonly buying_power: string
+    readonly status: string
+    readonly paper: boolean
+  }
+  readonly positions: readonly PaperPosition[]
+}
+
+/**
  * Bundle of everything the Oracle results page needs to render. The page
- * receives this as a single static prop assembled at build time. `sweep`
- * and `pitComparison` are optional — their absence does not break the
- * build, but the page always renders the brutal-disclaimer block whether
- * or not those diagnostics are present.
+ * receives this as a single static prop assembled at build time. `sweep`,
+ * `pitComparison`, and `paperStatus` are optional — their absence does not
+ * break the build, but the page always renders the brutal-disclaimer
+ * block whether or not those diagnostics are present.
  */
 export interface OracleArtifacts {
   readonly report: BacktestReport
@@ -132,4 +155,5 @@ export interface OracleArtifacts {
   readonly equityCurve: readonly EquityPoint[]
   readonly sweep: BacktestSweepReport | null
   readonly pitComparison: PointInTimeComparison | null
+  readonly paperStatus: PaperStatusSnapshot | null
 }

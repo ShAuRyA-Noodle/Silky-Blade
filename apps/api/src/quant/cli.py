@@ -32,6 +32,7 @@ backtest_app = typer.Typer(help="Walk-forward backtest runner + repro manifest."
 ml_app = typer.Typer(help="ML trainer (LightGBM, triple-barrier, purged K-fold).")
 paper_app = typer.Typer(help="Paper-trading planning (no broker submission yet).")
 data_app = typer.Typer(help="Data-quality utilities (CSV verification, etc.).")
+features_app = typer.Typer(help="Feature pipelines (sentiment, fundamentals, etc.).")
 app.add_typer(universe_app, name="universe")
 app.add_typer(backfill_app, name="backfill")
 app.add_typer(flow_app, name="flow")
@@ -39,6 +40,7 @@ app.add_typer(backtest_app, name="backtest")
 app.add_typer(ml_app, name="ml")
 app.add_typer(paper_app, name="paper")
 app.add_typer(data_app, name="data")
+app.add_typer(features_app, name="features")
 
 
 def _setup_logging() -> None:
@@ -747,7 +749,7 @@ def paper_status(
 def paper_now(
     signal_kind: Annotated[
         str,
-        typer.Option(help="momentum | low_vol | mean_reversion | ml_bundle"),
+        typer.Option(help="momentum | low_vol | mean_reversion | ml_bundle | value | sentiment | composite"),
     ] = "momentum",
     lookback_days: Annotated[int, typer.Option(help="Lookback for the signal AND for bar fetch")] = 126,
     top_k: Annotated[int, typer.Option(help="Number of positions to hold")] = 5,
@@ -760,12 +762,26 @@ def paper_now(
     ] = "DEV",
     model_dir: Annotated[
         str,
-        typer.Option(help="When --signal-kind ml_bundle, path to trainer artifact dir"),
+        typer.Option(
+            help="When --signal-kind ml_bundle (or composite primary=ml_bundle), trainer artifact dir"
+        ),
     ] = "",
     fundamentals_csv: Annotated[
         str,
         typer.Option(help="When --signal-kind value, path to fundamentals CSV"),
     ] = "",
+    sentiment_csv: Annotated[
+        str,
+        typer.Option(help="When --signal-kind sentiment OR composite, path to sentiment CSV"),
+    ] = "",
+    sentiment_lookback_days: Annotated[
+        int,
+        typer.Option(help="Days of sentiment history to average over"),
+    ] = 3,
+    alpha: Annotated[
+        float,
+        typer.Option(help="When --signal-kind composite, weight on the ML/primary side (0..1)"),
+    ] = 0.7,
     submit: Annotated[bool, typer.Option(help="Actually submit orders (otherwise plan-only)")] = False,
     confirm: Annotated[
         bool, typer.Option(help="Required alongside --submit before any order is sent")
@@ -796,6 +812,39 @@ def paper_now(
         if not fundamentals_csv:
             raise typer.BadParameter("--signal-kind value requires --fundamentals-csv")
         spec = SignalSpec(kind="value", params={"fundamentals_csv": fundamentals_csv})
+    elif signal_kind == "sentiment":
+        if not sentiment_csv:
+            raise typer.BadParameter("--signal-kind sentiment requires --sentiment-csv")
+        spec = SignalSpec(
+            kind="sentiment",
+            params={"sentiment_csv": sentiment_csv, "lookback_days": sentiment_lookback_days},
+        )
+    elif signal_kind == "composite":
+        # Composite blends an ML bundle (primary) with a sentiment score
+        # (secondary). Default α=0.7 means the model dominates; sentiment
+        # is a tilt, not a takeover.
+        if not model_dir:
+            raise typer.BadParameter("--signal-kind composite requires --model-dir (primary=ml_bundle)")
+        if not sentiment_csv:
+            raise typer.BadParameter("--signal-kind composite requires --sentiment-csv")
+        if not (0.0 <= alpha <= 1.0):
+            raise typer.BadParameter(f"--alpha must be in [0,1], got {alpha}")
+        spec = SignalSpec(
+            kind="composite",
+            params={
+                "primary": {"kind": "ml_bundle", "params": {"model_dir": model_dir}},
+                "secondary": {
+                    "kind": "sentiment",
+                    "params": {
+                        "sentiment_csv": sentiment_csv,
+                        "lookback_days": sentiment_lookback_days,
+                    },
+                },
+                "alpha": alpha,
+                "beta": 1.0 - alpha,
+                "outer_join": True,  # don't drop names without recent news
+            },
+        )
     else:
         spec = SignalSpec(kind=signal_kind, params={"lookback_days": lookback_days})
     sig = build_signal(spec)
@@ -878,6 +927,59 @@ def paper_now(
             )
 
     _run(_go())
+
+
+# ---------------------------------------------------------------
+# features — sentiment, fundamentals, etc.
+# ---------------------------------------------------------------
+@features_app.command("fetch-sentiment")
+def features_fetch_sentiment(
+    symbols: Annotated[
+        str,
+        typer.Option(help="Comma-separated symbols, OR 'DEV' for DEV_UNIVERSE"),
+    ],
+    out: Annotated[str, typer.Argument(help="Output CSV path")],
+    days: Annotated[int, typer.Option(help="Lookback window in days (max ~30 for free APIs)")] = 7,
+    use_marketaux: Annotated[bool, typer.Option(help="Pull from Marketaux")] = True,
+    use_newsapi: Annotated[bool, typer.Option(help="Pull from NewsAPI")] = True,
+) -> None:
+    """
+    Fetch news for symbols, score each via Groq, aggregate per (symbol, date),
+    write CSV. Output schema: symbol, date, sentiment_mean, sentiment_count,
+    sentiment_max_abs.
+    """
+    from quant.features.sentiment import fetch_and_score, write_sentiment_csv
+    from quant.universe.constituents import DEV_UNIVERSE as _DEV
+
+    _setup_logging()
+    for noisy in ("httpx", "httpcore"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
+
+    if symbols.upper() == "DEV":
+        sym_list = list(_DEV)
+    else:
+        sym_list = [s.strip().upper() for s in symbols.split(",") if s.strip()]
+    if not sym_list:
+        raise typer.BadParameter("--symbols resolved to empty list")
+
+    typer.echo(f"# fetching last {days}d of news for {len(sym_list)} symbols")
+    rows = _run(
+        fetch_and_score(
+            sym_list,
+            days=days,
+            use_marketaux=use_marketaux,
+            use_newsapi=use_newsapi,
+        )
+    )
+    write_sentiment_csv(rows, out)
+    typer.echo(f"# {len(rows)} (symbol,date) rows → {out}")
+    if rows:
+        typer.echo("# sample (top 5 by |sentiment_mean|):")
+        sorted_rows = sorted(rows, key=lambda r: -abs(float(r["sentiment_mean"])))[:5]
+        for r in sorted_rows:
+            typer.echo(
+                f"  {r['symbol']:<6} {r['date']}  mean={r['sentiment_mean']:+.3f}  n={r['sentiment_count']}"
+            )
 
 
 if __name__ == "__main__":

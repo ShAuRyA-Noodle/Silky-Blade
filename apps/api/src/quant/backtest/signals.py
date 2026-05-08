@@ -266,11 +266,99 @@ class ValueSignal:
         )
 
 
+@dataclass(frozen=True)
+class SentimentSignal:
+    """
+    Aggregated news-sentiment signal — score = mean of per-article Groq
+    sentiment scores over the last `lookback_days`. Reads a CSV produced
+    by `quant.features.sentiment.fetch_and_score` (schema: symbol, date,
+    sentiment_mean, sentiment_count, sentiment_max_abs).
+
+    Why this exists: LLMs (Groq Llama) are good at converting unstructured
+    text into a numeric sentiment score; bad at picking stocks directly.
+    The honest architecture uses the LLM as a feature extractor, not a
+    decision-maker. This signal is the feature in standalone form; the
+    `CompositeSignal` blends it with an ML / momentum signal.
+
+    Symbols missing from the CSV (no news in window) are silently
+    omitted — the SignalProducer contract is "score whoever you can".
+    """
+
+    sentiment_csv: str
+    lookback_days: int = 3
+
+    def __call__(self, as_of: date, history: pl.DataFrame) -> pl.DataFrame:
+        del history
+        df = pl.read_csv(self.sentiment_csv, try_parse_dates=True).with_columns(pl.col("date").cast(pl.Date))
+        if "symbol" not in df.columns or "sentiment_mean" not in df.columns:
+            raise ValueError(f"{self.sentiment_csv}: missing symbol/sentiment_mean columns")
+        from datetime import timedelta as _timedelta
+
+        window_start = as_of - _timedelta(days=self.lookback_days)
+        eligible = df.filter((pl.col("date") <= as_of) & (pl.col("date") >= window_start))
+        if eligible.is_empty():
+            return pl.DataFrame({"symbol": [], "score": []})
+        return (
+            eligible.group_by("symbol", maintain_order=True)
+            .agg(pl.col("sentiment_mean").mean().alias("score"))
+            .select(["symbol", "score"])
+        )
+
+
+@dataclass(frozen=True)
+class CompositeSignal:
+    """
+    Weighted blend of two SignalProducers. Useful for mixing an ML model
+    score with a sentiment score:
+
+        composite = α * ml_score + β * sentiment_score    where α + β = 1
+
+    Each child signal is run on the same (as_of, history) and their
+    score frames are inner-joined on `symbol` (so a name only appears
+    in the composite when BOTH children scored it). For a sentiment
+    blend that means the composite is conservative — names without
+    recent news drop out rather than getting a synthetic 0 sentiment.
+
+    To allow names that one child missed, use `outer_join=True`. The
+    missing side gets imputed to 0.
+    """
+
+    primary: object  # SignalProducer
+    secondary: object  # SignalProducer
+    alpha: float = 0.7  # weight on primary
+    beta: float = 0.3  # weight on secondary
+    outer_join: bool = False
+
+    def __call__(self, as_of: date, history: pl.DataFrame) -> pl.DataFrame:
+        if abs(self.alpha + self.beta - 1.0) > 1e-9:
+            raise ValueError(f"alpha+beta must equal 1.0, got {self.alpha + self.beta}")
+        a = self.primary(as_of, history)  # type: ignore[operator]
+        b = self.secondary(as_of, history)  # type: ignore[operator]
+        if a.is_empty() and b.is_empty():
+            return pl.DataFrame({"symbol": [], "score": []})
+
+        a = a.rename({"score": "_a"})
+        b = b.rename({"score": "_b"})
+        # polars 1.x renamed "outer" → "full"; we want full outer join here.
+        how: str = "full" if self.outer_join else "inner"
+        joined = a.join(b, on="symbol", how=how)
+        if self.outer_join:
+            joined = joined.with_columns(
+                pl.col("_a").fill_null(0.0).alias("_a"),
+                pl.col("_b").fill_null(0.0).alias("_b"),
+            )
+        return joined.with_columns(
+            (pl.col("_a") * self.alpha + pl.col("_b") * self.beta).alias("score")
+        ).select(["symbol", "score"])
+
+
 __all__ = [
+    "CompositeSignal",
     "LowVolSignal",
     "MLBundleSignal",
     "MLPredictionsSignal",
     "MeanReversionSignal",
     "MomentumSignal",
+    "SentimentSignal",
     "ValueSignal",
 ]

@@ -39,11 +39,13 @@ import polars as pl
 from quant.backtest.engine import SignalProducer, WalkForwardConfig, walk_forward
 from quant.backtest.reproducibility import build_manifest
 from quant.backtest.signals import (
+    CompositeSignal,
     LowVolSignal,
     MeanReversionSignal,
     MLBundleSignal,
     MLPredictionsSignal,
     MomentumSignal,
+    SentimentSignal,
     ValueSignal,
 )
 from quant.backtest.statistics import deflated_sharpe_ratio, sharpe_ratio
@@ -168,6 +170,34 @@ def build_signal(spec: SignalSpec) -> SignalProducer:
         if not isinstance(path, str) or not path:
             raise ValueError("value signal requires params.fundamentals_csv")
         return ValueSignal(fundamentals_csv=path)
+    if spec.kind == "sentiment":
+        sent_path = spec.params.get("sentiment_csv")
+        if not isinstance(sent_path, str) or not sent_path:
+            raise ValueError("sentiment signal requires params.sentiment_csv")
+        lookback = int(spec.params.get("lookback_days", 3))
+        return SentimentSignal(sentiment_csv=sent_path, lookback_days=lookback)
+    if spec.kind == "composite":
+        # Composite blends two children. Each child is itself a SignalSpec
+        # nested in params: params.primary = {kind, params}, params.secondary
+        # = {kind, params}. Weights default to alpha=0.7 / beta=0.3.
+        prim = spec.params.get("primary")
+        sec = spec.params.get("secondary")
+        if not isinstance(prim, dict) or not isinstance(sec, dict):
+            raise ValueError(
+                "composite signal requires params.primary AND params.secondary (each a {kind, params} dict)"
+            )
+        alpha = float(spec.params.get("alpha", 0.7))
+        beta = float(spec.params.get("beta", 1.0 - alpha))
+        outer = bool(spec.params.get("outer_join", False))
+        primary_sig = build_signal(SignalSpec(kind=str(prim["kind"]), params=dict(prim.get("params", {}))))
+        secondary_sig = build_signal(SignalSpec(kind=str(sec["kind"]), params=dict(sec.get("params", {}))))
+        return CompositeSignal(
+            primary=primary_sig,
+            secondary=secondary_sig,
+            alpha=alpha,
+            beta=beta,
+            outer_join=outer,
+        )
     raise ValueError(f"unknown signal kind: {spec.kind!r}")
 
 
