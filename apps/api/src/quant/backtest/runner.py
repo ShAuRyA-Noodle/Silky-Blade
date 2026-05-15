@@ -147,7 +147,22 @@ def _as_date(v: Any) -> date:
 # ------------------------------------------------------------------
 # Signal registry
 # ------------------------------------------------------------------
-def build_signal(spec: SignalSpec) -> SignalProducer:
+
+# These signal kinds use snapshot data (today's P/E, 7-30d news window).
+# They are LIVE-ONLY — using them in historical backtests introduces
+# catastrophic look-ahead bias (today's fundamentals applied to 2018 prices).
+_LIVE_ONLY_SIGNAL_KINDS: frozenset[str] = frozenset({"sentiment", "value"})
+
+
+def build_signal(spec: SignalSpec, *, backtest_mode: bool = False) -> SignalProducer:
+    if backtest_mode and spec.kind in _LIVE_ONLY_SIGNAL_KINDS:
+        raise ValueError(
+            f"Signal kind {spec.kind!r} is live-only: it uses snapshot data "
+            f"(today's P/E or 7-30d news window). Running it against historical "
+            f"dates introduces catastrophic look-ahead bias — today's data applied "
+            f"to past prices produces fake alpha. Use momentum, ml_predictions, or "
+            f"ml_bundle for historical backtests."
+        )
     if spec.kind == "momentum":
         return MomentumSignal(lookback_days=int(spec.params.get("lookback_days", 126)))
     if spec.kind == "low_vol":
@@ -243,7 +258,7 @@ def run_backtest(cfg: RunConfig) -> dict[str, Any]:
     if prices.is_empty():
         raise RuntimeError(f"no price rows in {cfg.prices_csv} for {cfg.start_date}→{cfg.end_date}")
 
-    producer = build_signal(cfg.signal)
+    producer = build_signal(cfg.signal, backtest_mode=True)
     universe_filter = _build_universe_filter(cfg.universe)
     result = walk_forward(prices, producer, cfg.walk_forward, universe_filter=universe_filter)
 

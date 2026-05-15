@@ -15,7 +15,7 @@ export const dynamic = "force-static"
 
 export const metadata: Metadata = {
   title: "Paper account — ORACLE",
-  description: "Live Alpaca paper trading account state and open positions.",
+  description: "Alpaca paper trading account snapshot. Read from disk at build time — not a live feed.",
 }
 
 const usd = new Intl.NumberFormat("en-US", {
@@ -40,22 +40,22 @@ export default function PaperPage() {
     <main id="oracle-paper" className="relative">
       <section className="relative px-6 py-20 md:py-28">
         <div className="container mx-auto max-w-6xl">
-          <div className="text-[11px] font-mono tracking-[0.3em] uppercase text-primary mb-3">
-            Paper account · Alpaca
+          <div className="flex items-center gap-3 mb-3">
+            <div className="text-[11px] font-mono tracking-[0.3em] uppercase text-primary">
+              Paper account · Alpaca
+            </div>
+            <span className="text-[10px] font-mono tracking-[0.15em] uppercase border border-border/50 rounded px-2 py-0.5 text-muted-foreground/60">
+              Static snapshot · not live
+            </span>
           </div>
           <h1 className="text-4xl md:text-6xl font-semibold tracking-[-0.025em] mb-6">
-            Live paper trading state.
+            Paper account snapshot.
           </h1>
           <p className="text-base md:text-lg text-muted-foreground max-w-2xl leading-relaxed">
-            Snapshot of the operator&rsquo;s Alpaca paper account at last
-            refresh. Read-only view, sourced from
-            {" "}<code className="font-mono text-primary">paper-status.json</code> on
-            disk. No real money. No order routing. No promises about future
-            returns. To regenerate run{" "}
-            <code className="font-mono text-primary">
-              quant paper status --json-out apps/web/.oracle-artifacts/paper-status.json
-            </code>
-            .
+            Read from <code className="font-mono text-primary">paper-status.json</code> at
+            build time — this is not a live feed. The cron job updates it once per weekday
+            after market close and pushes a commit; Vercel rebuilds the page on push.
+            No real money. No live order routing.
           </p>
         </div>
       </section>

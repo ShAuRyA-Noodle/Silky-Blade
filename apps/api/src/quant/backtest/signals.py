@@ -308,19 +308,24 @@ class SentimentSignal:
 @dataclass(frozen=True)
 class CompositeSignal:
     """
-    Weighted blend of two SignalProducers. Useful for mixing an ML model
-    score with a sentiment score:
+    Late-stage LINEAR BLEND of two SignalProducers:
 
-        composite = α * ml_score + β * sentiment_score    where α + β = 1
+        composite_score = α * primary_score + β * secondary_score   (α + β = 1)
 
-    Each child signal is run on the same (as_of, history) and their
-    score frames are inner-joined on `symbol` (so a name only appears
-    in the composite when BOTH children scored it). For a sentiment
-    blend that means the composite is conservative — names without
-    recent news drop out rather than getting a synthetic 0 sentiment.
+    ARCHITECTURE HONESTY: This is a parallel signal blend — both children
+    produce independent scores which are then averaged. This is NOT the same
+    as injecting one signal as a feature into a trained model. If you want
+    sentiment as a true ML feature, add it to FEATURE_COLUMNS in trainer.py
+    and retrain. That would give the model nonlinear interactions between
+    sentiment and price features.
 
-    To allow names that one child missed, use `outer_join=True`. The
-    missing side gets imputed to 0.
+    The current design is appropriate for live production use where retraining
+    is expensive: the LLM-scored sentiment acts as a real-time overlay that
+    shifts the ML signal's conviction score up or down. It is NOT a substitute
+    for adding sentiment to the training set.
+
+    Join semantics: inner-join by default (conservative — names without
+    sentiment drop out). Set outer_join=True to impute 0 for missing side.
     """
 
     primary: object  # SignalProducer

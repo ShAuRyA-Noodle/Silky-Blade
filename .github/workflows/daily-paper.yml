@@ -1,37 +1,76 @@
 name: Daily paper-trading rebalance
 
 # Runs every weekday at 21:30 UTC (~5:30 PM ET, after US market close).
-# Pulls latest Alpaca paper account state, runs the ML model, optionally
-# submits paper orders, snapshots the result, appends to the equity-history
-# CSV, and commits both back to the repo. Vercel rebuilds the /paper
-# page on push so the operator's phone shows yesterday's state.
+#
+# What this job does:
+#   1. Always: snapshot the Alpaca paper account state → paper-status.json
+#   2. Always: append equity to paper-history.csv
+#   3. If TRADING_ENABLED=true: compute momentum signal → propose orders → submit
+#   4. Commit artifacts back to repo → Vercel rebuilds /paper page
 #
 # Required secrets (Settings → Secrets and variables → Actions):
 #   ALPACA_API_KEY_ID, ALPACA_API_SECRET_KEY  (paper account)
-#   POLYGON_API_KEY, FRED_API_KEY, TIINGO_API_KEY,
-#   GROQ_API_KEY, FINNHUB_API_KEY, MARKETAUX_API_KEY,
-#   NEWSAPI_KEY, FMP_API_KEY, ALPHAVANTAGE_API_KEY,
-#   NASDAQ_DATA_LINK_API_KEY  (any subset; only Alpaca is required)
-#   JWT_SECRET_KEY            (Settings validator requires non-empty)
+#   JWT_SECRET_KEY  (settings validator requires non-empty)
 #
-# Optional vars:
-#   TRADING_ENABLED           ("true" to actually submit; otherwise plan-only)
+# Optional secrets (for full provider coverage):
+#   POLYGON_API_KEY, FRED_API_KEY, TIINGO_API_KEY, GROQ_API_KEY,
+#   FINNHUB_API_KEY, MARKETAUX_API_KEY, NEWSAPI_KEY, FMP_API_KEY,
+#   ALPHAVANTAGE_API_KEY, NASDAQ_DATA_LINK_API_KEY
+#
+# Optional secrets (for alerting):
+#   SLACK_WEBHOOK_URL  — Slack-compatible webhook for order alerts
+#
+# Repository variables (Settings → Variables → Actions):
+#   TRADING_ENABLED   — set to "true" to actually submit paper orders
+#                       defaults to "false" (plan-only, safe)
+#
+# Safety gates (ALL required to submit):
+#   ALPACA_PAPER=true  (hardcoded here — never routes to live broker)
+#   TRADING_ENABLED=true  (GitHub variable, opt-in)
+#   --confirm flag  (passed explicitly below)
+#   LIVE_TRADING_CONFIRMED is NOT set (paper only)
+#
+# Signal: 126-day momentum, SP500 universe, top-5 equal-weight.
+# No ML model artifacts needed — momentum uses only price data from Alpaca.
 
 on:
   schedule:
     - cron: "30 21 * * 1-5"
-  workflow_dispatch: # manual trigger from the Actions UI
+  workflow_dispatch:
 
 permissions:
-  contents: write # for the auto-commit of paper-history.csv
+  contents: write
 
 jobs:
   paper-rebalance:
-    name: Refresh paper account snapshot + (optional) rebalance
+    name: Snapshot + (optional) rebalance
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: apps/api
+
+    env:
+      APP_ENV: development
+      JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+      ALPACA_API_KEY_ID: ${{ secrets.ALPACA_API_KEY_ID }}
+      ALPACA_API_SECRET_KEY: ${{ secrets.ALPACA_API_SECRET_KEY }}
+      ALPACA_PAPER: "true"
+      ALPACA_BASE_URL: "https://paper-api.alpaca.markets"
+      ALPACA_DATA_URL: "https://data.alpaca.markets"
+      POLYGON_API_KEY: ${{ secrets.POLYGON_API_KEY }}
+      FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+      TIINGO_API_KEY: ${{ secrets.TIINGO_API_KEY }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+      MARKETAUX_API_KEY: ${{ secrets.MARKETAUX_API_KEY }}
+      NEWSAPI_KEY: ${{ secrets.NEWSAPI_KEY }}
+      FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+      ALPHAVANTAGE_API_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
+      NASDAQ_DATA_LINK_API_KEY: ${{ secrets.NASDAQ_DATA_LINK_API_KEY }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      TRADING_ENABLED: ${{ vars.TRADING_ENABLED || 'false' }}
+      LIVE_TRADING_CONFIRMED: "false"
+      MLFLOW_TRACKING_URI: file:///tmp/mlruns
 
     steps:
       - uses: actions/checkout@v4
@@ -49,33 +88,42 @@ jobs:
       - name: Install dependencies
         run: uv pip install --system -e ".[dev]"
 
-      - name: Refresh snapshot + history
-        env:
-          APP_ENV: development
-          JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
-          ALPACA_API_KEY_ID: ${{ secrets.ALPACA_API_KEY_ID }}
-          ALPACA_API_SECRET_KEY: ${{ secrets.ALPACA_API_SECRET_KEY }}
-          ALPACA_PAPER: "true"
-          ALPACA_BASE_URL: "https://paper-api.alpaca.markets"
-          ALPACA_DATA_URL: "https://data.alpaca.markets"
-          POLYGON_API_KEY: ${{ secrets.POLYGON_API_KEY }}
-          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
-          TIINGO_API_KEY: ${{ secrets.TIINGO_API_KEY }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          TRADING_ENABLED: ${{ vars.TRADING_ENABLED || 'false' }}
-          MLFLOW_TRACKING_URI: file:///tmp/mlruns
+      - name: Snapshot paper account
         run: |
           mkdir -p ../web/.oracle-artifacts
           python -m quant.cli paper status \
             --json-out ../web/.oracle-artifacts/paper-status.json \
             --history-csv ../web/.oracle-artifacts/paper-history.csv
 
+      - name: Compute + submit paper orders
+        if: vars.TRADING_ENABLED == 'true'
+        run: |
+          echo "TRADING_ENABLED=true — computing and submitting paper orders"
+          python -m quant.cli paper now \
+            --signal-kind momentum \
+            --lookback-days 126 \
+            --top-k 5 \
+            --universe SP500 \
+            --submit \
+            --confirm
+
+      - name: Plan-only run (TRADING_ENABLED != true)
+        if: vars.TRADING_ENABLED != 'true'
+        run: |
+          echo "TRADING_ENABLED not set — plan-only run (no orders submitted)"
+          python -m quant.cli paper now \
+            --signal-kind momentum \
+            --lookback-days 126 \
+            --top-k 5 \
+            --universe DEV
+
       - name: Commit snapshot + history
         run: |
           cd ../..
           git config user.name "oracle-paper-bot"
           git config user.email "actions@github.com"
-          git add apps/web/.oracle-artifacts/paper-status.json apps/web/.oracle-artifacts/paper-history.csv || true
+          git add apps/web/.oracle-artifacts/paper-status.json \
+                  apps/web/.oracle-artifacts/paper-history.csv || true
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
