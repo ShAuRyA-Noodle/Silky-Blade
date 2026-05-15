@@ -299,24 +299,19 @@ def ml_tune(
     base = load_config(config)
     typer.echo(f"Tuning '{base.name}' — {n_trials} TPE trials")
     rep = tune(base, n_trials=n_trials, seed=seed)
-    typer.echo(f"# best logloss = {rep.best_value:.4f} (over {rep.n_trials} trials)")
+    typer.echo(f"# best logloss = {rep['best_value']:.4f} (over {rep['n_trials']} trials, TUNING WINDOW ONLY — selection-biased)")
+    typer.echo(f"# holdout start: {rep['holdout_start_date']}")
+    if rep.get("holdout_metrics"):
+        hm = rep["holdout_metrics"]
+        typer.echo(f"# holdout eval: logloss={hm.get('oof_logloss', 'n/a'):.4f}  auc={hm.get('oof_macro_auc', 'n/a'):.4f}")
     typer.echo("# best params:")
-    for k, v in sorted(rep.best_params.items()):
+    for k, v in sorted(rep["best_params"].items()):
         typer.echo(f"  {k:<20} {v}")
     if json_out:
         from pathlib import Path as _Path
 
         _Path(json_out).write_text(
-            json.dumps(
-                {
-                    "n_trials": rep.n_trials,
-                    "best_value": rep.best_value,
-                    "best_params": rep.best_params,
-                    "history": rep.history,
-                },
-                indent=2,
-                default=str,
-            ),
+            json.dumps(rep, indent=2, default=str),
             encoding="utf-8",
         )
         typer.echo(f"# JSON written to {json_out}")

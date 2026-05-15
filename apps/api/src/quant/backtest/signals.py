@@ -108,26 +108,31 @@ def _neg_log_return_std(prices: list[float]) -> float:
 @dataclass(frozen=True)
 class MLPredictionsSignal:
     """
-    Replay an ML trainer's out-of-fold predictions as a long-only signal.
+    Replay an ML trainer's out-of-fold predictions as a signal.
+
+    IMPORTANT — OPTIMISM WARNING:
+        OOF (out-of-fold) predictions are NOT the same as true forward-deployed
+        predictions. In purged K-fold CV, fold k is predicted by a model trained
+        on folds {0..K-1}\{k}. For half of the folds, the training set includes
+        data AFTER the prediction date (calendar-time ordering is not preserved
+        across folds). The purged-K-fold embargo prevents direct look-ahead, but
+        the resulting OOF Sharpe is OPTIMISTIC vs. a model deployed strictly
+        forward in time.
+
+        Use `MLBundleSignal` for a true forward simulation: it loads the saved
+        artifact bundle and computes predictions on demand at each rebalance date
+        using only data available at that point. That is the honest baseline for
+        production deployment.
+
+        `MLPredictionsSignal` is appropriate for comparing the ML model to the
+        momentum baseline on the SAME historical window, with the understanding
+        that the Sharpe is slightly optimistic due to the above.
 
     The trainer artifact bundle written by `quant.ml.trainer.train` includes
     `oof_predictions.csv` with columns `[date, symbol, prob_neg1, prob_zero,
     prob_pos1, prob_*_calibrated, in_oof, pred_class]`. This signal loads
-    that file once at construction time, indexes by `(date, symbol)`, and on
-    each rebalance returns `score = P(+1) - P(-1)` for symbols with an
-    in-OOF prediction available at the as-of date.
-
-    The score is a long-short conviction; we use only the long side here
-    (top-k highest scores). Calibrated probabilities are preferred when
-    present — calibration is a property of the predictor, not the signal,
-    and using the calibrated columns is the honest default.
-
-    Why this is the bridge that closes the loop: the LightGBM model trained
-    on triple-barrier labels with purged K-fold CV + embargo is the central
-    ML claim in TRUST.md. Before this signal existed, that model never
-    produced a Sharpe number anyone could compare to the momentum baseline.
-    With it, the same walk-forward engine that prices the baseline also
-    prices the model — apples-to-apples.
+    that file once at construction time and returns `score = P(+1) - P(-1)`
+    for symbols with an in-OOF prediction at or before the as-of date.
     """
 
     predictions_csv: str

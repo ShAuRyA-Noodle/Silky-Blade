@@ -387,22 +387,71 @@ def train(cfg: TrainConfig) -> dict[str, Any]:
             "per_class": _per_class_prf(oof_y_enc, oof_pred_enc),
         }
 
-        # ---------- probability calibration (isotonic, fit on OOF) ----------
-        # Tree ensembles produce miscalibrated probabilities by default.
-        # Calibrators fit on OOF predictions only — never on training data —
-        # so the purged-K-fold leakage protections still hold.
+        # ---------- probability calibration (isotonic) ----------
+        # Calibrators are fit on the FIRST 80% of OOF dates (chronological).
+        # ECE is evaluated on the LAST 20% of OOF dates (held-out).
+        # Fitting and evaluating on the same data would always show ECE→0
+        # by construction (isotonic regression is a perfect calibrator on its
+        # own training set). The held-out ECE is the honest generalization metric.
         from quant.ml.calibration import (
             apply_calibrators,
             expected_calibration_error,
             fit_isotonic_per_class,
         )
 
+        # Use .to_list() not .to_numpy().tolist() — Polars Date → Python date objects
+        # (to_numpy() gives datetime64 which doesn't compare equal to Python date).
+        oof_dates_list = meta.filter(oof_mask)["date"].to_list()
+        unique_oof_dates = sorted(set(oof_dates_list))
+
         ece_raw = expected_calibration_error(oof_p, oof_y_enc)
-        calibrators = fit_isotonic_per_class(oof_p, oof_y_enc)
-        oof_p_calibrated = apply_calibrators(oof_p, calibrators)
-        ece_cal = expected_calibration_error(oof_p_calibrated, oof_y_enc)
+
+        # Held-out ECE requires enough unique dates for a meaningful 80/20 split.
+        # Minimum 10 unique dates ensures cal_train portion is non-empty even on
+        # small test panels. Below that threshold, fall back to full-OOF calibration
+        # (in-sample only, acknowledged as such in the report).
+        _MIN_DATES_FOR_HOLDOUT = 10
+        can_holdout = len(unique_oof_dates) >= _MIN_DATES_FOR_HOLDOUT
+
+        if can_holdout:
+            n_holdout_dates = max(1, len(unique_oof_dates) // 5)  # last 20%
+            holdout_date_set = set(unique_oof_dates[-n_holdout_dates:])
+            holdout_bool = np.array([d in holdout_date_set for d in oof_dates_list])
+
+            cal_train_p = oof_p[~holdout_bool]
+            cal_train_y = oof_y_enc[~holdout_bool]
+            cal_holdout_p = oof_p[holdout_bool]
+            cal_holdout_y = oof_y_enc[holdout_bool]
+
+            calibrators = fit_isotonic_per_class(cal_train_p, cal_train_y)
+            oof_p_calibrated_train = apply_calibrators(cal_train_p, calibrators)
+            ece_cal_insample = expected_calibration_error(oof_p_calibrated_train, cal_train_y)
+            oof_p_calibrated_holdout = apply_calibrators(cal_holdout_p, calibrators)
+            ece_cal_holdout = expected_calibration_error(oof_p_calibrated_holdout, cal_holdout_y)
+            oof_p_calibrated = apply_calibrators(oof_p, calibrators)
+            ece_cal = expected_calibration_error(oof_p_calibrated, oof_y_enc)
+            holdout_meta: dict[str, Any] = {
+                "ece_calibrated_macro_insample": ece_cal_insample[-1],
+                "ece_calibrated_macro_holdout": ece_cal_holdout[-1],
+                "ece_holdout_n_samples": int(np.sum(holdout_bool)),
+                "ece_holdout_date_range": f"{unique_oof_dates[-n_holdout_dates]} to {unique_oof_dates[-1]}",
+            }
+        else:
+            # Too few unique dates for a meaningful train/holdout split.
+            # Fall back to full-OOF calibration — biased in-sample but not empty.
+            calibrators = fit_isotonic_per_class(oof_p, oof_y_enc)
+            oof_p_calibrated = apply_calibrators(oof_p, calibrators)
+            ece_cal = expected_calibration_error(oof_p_calibrated, oof_y_enc)
+            holdout_meta = {
+                "ece_calibrated_macro_insample": ece_cal[-1],
+                "ece_calibrated_macro_holdout": None,
+                "ece_holdout_n_samples": 0,
+                "ece_holdout_date_range": f"n/a (fewer than {_MIN_DATES_FOR_HOLDOUT} unique dates)",
+            }
+
         agg["oof_calibration"] = {
             "ece_raw_macro": ece_raw[-1],
+            **holdout_meta,
             "ece_calibrated_macro": ece_cal[-1],
             "ece_raw_per_class": {int(k): float(v) for k, v in ece_raw.items() if k >= 0},
             "ece_calibrated_per_class": {int(k): float(v) for k, v in ece_cal.items() if k >= 0},
@@ -428,6 +477,7 @@ def train(cfg: TrainConfig) -> dict[str, Any]:
                 ),
                 "oof_ece_raw_macro": agg["oof_calibration"]["ece_raw_macro"],
                 "oof_ece_calibrated_macro": agg["oof_calibration"]["ece_calibrated_macro"],
+                "oof_ece_calibrated_holdout": agg["oof_calibration"]["ece_calibrated_macro_holdout"],
                 "oof_logloss_calibrated": agg["oof_calibration"]["oof_logloss_calibrated"],
                 "cv_logloss_mean": float(np.mean([m["val_logloss"] for m in fold_metrics])),
                 "cv_balanced_accuracy_mean": float(

@@ -1,7 +1,22 @@
 """
-Pre-trade risk manager.
+Pre-trade risk manager — DB-backed path for the REST API order flow.
 
-Every order flows through `RiskManager.check(intent)` before submission.
+ARCHITECTURE NOTE: This module is used by the FastAPI REST order endpoints
+(quant/api/v1/orders.py, quant/api/v1/admin.py). It is NOT the same as
+execution/risk_gate.py, which is the stateless, DB-free risk check used
+by the live trading session (run_live_session).
+
+Two separate risk layers by design:
+    quant.risk.manager      — DB-backed, full sector/drawdown/daily-loss/Redis
+                              kill-switch checks. Used by the API order service.
+                              Requires an active Postgres + Redis connection.
+    quant.execution.risk_gate — Stateless file-CLI check. Used by live_session.
+                              No DB needed; runs in CLI/cron contexts.
+
+The live session's risk_gate is the active production path for paper trading.
+This module is the active path for any REST-API-submitted orders (future).
+
+Every order submitted via the API flows through RiskManager.check(intent).
 Violations raise `RiskViolation` with a human-readable reason — the order
 is blocked, logged, and never touches the broker.
 
@@ -155,7 +170,7 @@ class RiskManager:
 
     async def _open_position_count(self, user_id: str) -> int:
         stmt = select(func.count()).select_from(Position).where(Position.user_id == user_id)
-        return int((await self.session.execute(stmt)).scalar() or 0)
+        return (await self.session.execute(stmt)).scalar() or 0
 
     async def _has_position(self, user_id: str, symbol: str) -> bool:
         stmt = select(Position.id).where(Position.user_id == user_id, Position.symbol == symbol)

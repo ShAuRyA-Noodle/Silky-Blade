@@ -164,6 +164,17 @@ export function HonestyBlock({ sweep, pitComparison }: HonestyBlockProps) {
             <li className="flex gap-3">
               <span className="text-primary mt-1">·</span>
               <span>
+                <span className="text-primary">Window risk:</span> The 2019–2026
+                backtest window contains the 2020 COVID recovery rally, the
+                2021 liquidity surge, and the 2023–2024 AI-driven mega-cap run.
+                Long-only top-K momentum during those periods was structurally
+                advantaged. The headline Sharpe of 1.703 is conditioned on this
+                specific historical episode — not a generalizable claim.
+              </span>
+            </li>
+            <li className="flex gap-3">
+              <span className="text-primary mt-1">·</span>
+              <span>
                 These are <span className="text-primary">backtest</span> numbers,
                 not live trading numbers. Live out-of-sample results are
                 routinely lower than backtests for every strategy ever run.
@@ -198,7 +209,7 @@ export function HonestyBlock({ sweep, pitComparison }: HonestyBlockProps) {
 
         <div className="flex flex-wrap gap-3">
           <Link
-            href="https://github.com/ShAuRyA-Noodle/Shaurya-Stocks/blob/main/TRUST.md"
+            href="https://github.com/ShAuRyA-Noodle/Silky-Blade/blob/main/TRUST.md"
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center gap-2 rounded-full border border-primary/40 px-5 py-3 text-sm font-mono uppercase tracking-[0.2em] text-primary hover:bg-primary/10 transition-colors"
@@ -207,7 +218,7 @@ export function HonestyBlock({ sweep, pitComparison }: HonestyBlockProps) {
             <ArrowUpRight className="w-4 h-4" />
           </Link>
           <Link
-            href="https://github.com/ShAuRyA-Noodle/Shaurya-Stocks/blob/main/REPRODUCE.md"
+            href="https://github.com/ShAuRyA-Noodle/Silky-Blade/blob/main/REPRODUCE.md"
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center gap-2 rounded-full border border-border/60 px-5 py-3 text-sm font-mono uppercase tracking-[0.2em] text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors"
