@@ -94,9 +94,6 @@ export function HorizontalScroll() {
             Every layer, accounted for.
           </h2>
         </div>
-        <div className="hidden md:block text-xs font-mono text-muted-foreground">
-          ← scroll →
-        </div>
       </div>
 
       <div

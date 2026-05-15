@@ -21,7 +21,8 @@ export function FooterScene() {
     const big = bigRef.current
     if (!root || !big) return
 
-    const split = new SplitType(big, { types: "chars", tagName: "span" })
+    // words,chars prevents mid-word line break ("ORA CLE" bug)
+    const split = new SplitType(big, { types: "words,chars", tagName: "span" })
 
     const ctx = gsap.context(() => {
       if (!reduced) {
@@ -39,7 +40,6 @@ export function FooterScene() {
         )
       }
 
-      // Magnetic CTA
       const cta = ctaRef.current
       if (cta && !reduced) {
         const handleMove = (e: MouseEvent) => {
@@ -75,19 +75,19 @@ export function FooterScene() {
         }}
       />
       <div className="container mx-auto max-w-6xl text-center relative">
-        <div className="text-xs font-mono tracking-[0.3em] uppercase text-primary mb-6">
-          Enter
+        {/* "Enter" label removed */}
+        <div className="overflow-hidden">
+          <h2
+            ref={bigRef}
+            className="text-[clamp(2.5rem,7vw,7rem)] font-semibold leading-[0.92] tracking-[-0.035em] text-primary [perspective:1000px]"
+            style={{
+              textShadow:
+                "0 0 60px rgba(25,130,196,0.5), 0 0 120px rgba(25,130,196,0.25)",
+            }}
+          >
+            RUN THE ORACLE
+          </h2>
         </div>
-        <h2
-          ref={bigRef}
-          className="text-[clamp(3rem,13vw,11rem)] font-semibold leading-[0.9] tracking-[-0.035em] text-primary [perspective:1000px] overflow-hidden"
-          style={{
-            textShadow:
-              "0 0 60px rgba(25,130,196,0.5), 0 0 120px rgba(25,130,196,0.25)",
-          }}
-        >
-          RUN THE ORACLE
-        </h2>
         <a
           ref={ctaRef}
           href="#terminal"
@@ -107,10 +107,10 @@ export function FooterScene() {
             <Github className="w-5 h-5 text-primary mb-3" />
             <div className="text-sm font-mono text-muted-foreground">
               <a
-                href="https://github.com/ShAuRyA-Noodle/Shaurya-Stocks"
-                className="hover:text-primary"
+                href="https://github.com/ShAuRyA-Noodle/Silky-Blade"
+                className="hover:text-primary transition-colors"
               >
-                ShAuRyA-Noodle / Shaurya-Stocks
+                ShAuRyA-Noodle / Silky-Blade
               </a>
             </div>
           </div>
