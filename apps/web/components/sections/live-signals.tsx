@@ -81,7 +81,7 @@ export function LiveSignals() {
     <section
       id="terminal"
       ref={rootRef}
-      className="relative py-32 px-6 bg-background border-t border-border/40"
+      className="relative py-32 px-6 bg-background border-t border-border/40 scroll-mt-16"
     >
       <div className="container mx-auto max-w-7xl">
         <div className="flex items-end justify-between flex-wrap gap-6 mb-12">

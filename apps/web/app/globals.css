@@ -226,10 +226,11 @@
   50%      { opacity: var(--breath-to, 0.6);  transform: translate3d(0, -10px, 0) scale(1.05); }
 }
 
-/* SplitType helpers */
+/* SplitType helpers — opacity:1 default ensures text visible if GSAP fails */
 .char, .word, .line {
   display: inline-block;
   will-change: transform, opacity;
+  opacity: 1;
 }
 .line { overflow: hidden; }
 

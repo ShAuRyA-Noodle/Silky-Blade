@@ -119,7 +119,7 @@ export function PinnedFeatures() {
     <section
       id="philosophy"
       ref={rootRef}
-      className="relative h-screen w-full overflow-hidden bg-background"
+      className="relative h-screen w-full overflow-hidden bg-background scroll-mt-16"
     >
       {/* Left rail: index + progress */}
       <div className="absolute left-8 top-1/2 -translate-y-1/2 z-20 hidden lg:flex flex-col items-center gap-6">
@@ -149,7 +149,7 @@ export function PinnedFeatures() {
             <article
               key={p.k}
               className="pin-panel absolute inset-0 flex items-center justify-center px-6 will-change-transform will-change-opacity"
-              style={{ zIndex: idx + 1 }}
+              style={{ zIndex: idx + 1, opacity: idx === 0 ? 1 : 0 }}
             >
               <div className="container mx-auto max-w-6xl grid lg:grid-cols-[1.2fr_1fr] gap-12 items-center">
                 <div>
@@ -169,7 +169,7 @@ export function PinnedFeatures() {
                 </div>
                 <div className="relative">
                   <div className="relative aspect-square max-w-md mx-auto">
-                    <div className="absolute inset-0 rounded-full bg-gradient-to-br from-primary/30 via-secondary/10 to-transparent blur-2xl" />
+                    <div className="pointer-events-none absolute inset-0 rounded-full bg-gradient-to-br from-primary/30 via-secondary/10 to-transparent blur-2xl" />
                     <div className="absolute inset-6 rounded-3xl border border-primary/20 backdrop-blur-xl bg-card/40 flex flex-col items-center justify-center text-center gap-4 shadow-[0_0_60px_rgba(25,130,196,0.2)]">
                       <Icon className="w-12 h-12 text-primary" />
                       <div className="text-5xl font-semibold tracking-tight text-primary font-mono tabular-nums">
@@ -179,7 +179,7 @@ export function PinnedFeatures() {
                         {p.statLabel}
                       </div>
                     </div>
-                    <div className="absolute inset-0 rounded-full border border-primary/10 animate-[spin_20s_linear_infinite]" />
+                    <div className="pointer-events-none absolute inset-0 rounded-full border border-primary/10 animate-[spin_20s_linear_infinite]" />
                   </div>
                 </div>
               </div>

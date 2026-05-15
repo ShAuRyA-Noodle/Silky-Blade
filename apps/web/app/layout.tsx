@@ -55,9 +55,7 @@ export default function RootLayout({
       >
         <SmoothScroll>
           <TopNav />
-          <main className="page-enter overflow-x-hidden w-full max-w-full">
-            {children}
-          </main>
+          {children}
         </SmoothScroll>
         <Analytics />
       </body>
