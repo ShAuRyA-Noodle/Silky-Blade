@@ -64,8 +64,13 @@ export function PinnedFeatures() {
       const panels = gsap.utils.toArray<HTMLElement>(".pin-panel")
       const total = panels.length
 
+      // Inline styles already set panel 0 = opacity:1, panels 1-3 = opacity:0.
+      // Never call gsap.set with opacity:1 on ALL panels — that undoes CSS defaults.
       if (reduced) {
-        gsap.set(panels, { opacity: 1, yPercent: 0 })
+        // Reduced motion: keep panels hidden except first, no animation.
+        panels.forEach((panel, i) => {
+          gsap.set(panel, { yPercent: 0, opacity: i === 0 ? 1 : 0 })
+        })
         return
       }
 
@@ -82,6 +87,7 @@ export function PinnedFeatures() {
           start: "top top",
           end: () => `+=${total * 90}%`,
           pin: true,
+          pinType: "transform",
           scrub: 0.6,
           anticipatePin: 1,
         },
@@ -108,6 +114,7 @@ export function PinnedFeatures() {
           start: "top top",
           end: () => `+=${total * 90}%`,
           scrub: true,
+          pinType: "transform",
         },
       })
     }, root)
