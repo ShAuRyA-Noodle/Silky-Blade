@@ -84,7 +84,7 @@ export function LiveSignals({ staticSignals = [] }: LiveSignalsProps) {
           duration: 0.7,
           stagger: 0.05,
           ease: "power3.out",
-          scrollTrigger: { trigger: root, start: "top 70%" },
+          scrollTrigger: { trigger: root, start: "top 70%", once: true },
         },
       )
     }, root)

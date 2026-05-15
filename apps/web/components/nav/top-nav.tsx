@@ -12,8 +12,8 @@ if (typeof window !== "undefined") {
 const LINKS = [
   { href: "/results", label: "Results" },
   { href: "/paper", label: "Paper" },
-  { href: "#philosophy", label: "Method" },
-  { href: "#terminal", label: "Signals" },
+  { href: "/#philosophy", label: "Method" },
+  { href: "/#terminal", label: "Signals" },
 ]
 
 export function TopNav() {
@@ -23,11 +23,19 @@ export function TopNav() {
   useEffect(() => {
     const el = ref.current
     if (!el) return
-    const st = ScrollTrigger.create({
-      start: 0,
-      end: "max",
-      onUpdate: (self) => setProgress(self.progress),
-    })
+
+    // Pure JS scroll progress — never uses GSAP cached scroll height.
+    // GSAP end:"max" uses the home-page's 1120vh pinned height on shorter
+    // pages, making the bar stop at ~50% on /results and /paper.
+    const updateProgress = () => {
+      const scrollTop = window.scrollY
+      const docHeight = document.documentElement.scrollHeight - window.innerHeight
+      setProgress(docHeight > 0 ? scrollTop / docHeight : 0)
+    }
+    window.addEventListener("scroll", updateProgress, { passive: true })
+    updateProgress() // set immediately on mount
+
+    // Stuck state still via GSAP (this is position-based, not height-based — safe)
     const topTrigger = ScrollTrigger.create({
       start: 40,
       end: 99999,
@@ -35,8 +43,9 @@ export function TopNav() {
         el.dataset.stuck = self.isActive ? "1" : "0"
       },
     })
+
     return () => {
-      st.kill()
+      window.removeEventListener("scroll", updateProgress)
       topTrigger.kill()
     }
   }, [])
@@ -51,7 +60,6 @@ export function TopNav() {
         data-[stuck=1]:shadow-[0_1px_0_rgba(25,130,196,0.08)]"
     >
       <div className="container mx-auto max-w-7xl px-6 h-16 flex items-center justify-between">
-        {/* Logo */}
         <Link
           href="/"
           className="flex items-center gap-2.5 text-sm font-mono tracking-[0.3em] uppercase text-foreground hover:text-primary transition-colors duration-200"
@@ -62,7 +70,6 @@ export function TopNav() {
           Oracle
         </Link>
 
-        {/* Nav links */}
         <nav className="hidden md:flex items-center gap-7 text-[11px] font-mono tracking-[0.18em] uppercase">
           {LINKS.map((l) => (
             <Link
@@ -76,20 +83,18 @@ export function TopNav() {
           ))}
         </nav>
 
-        {/* CTA */}
         <Link
-          href="#terminal"
+          href="/#terminal"
           className="rounded-full border border-primary/35 bg-primary/8 px-4 py-2 text-[11px] font-mono uppercase tracking-[0.2em] text-primary hover:bg-primary/15 hover:border-primary/60 transition-all duration-200"
         >
           Launch →
         </Link>
       </div>
 
-      {/* Scroll progress bar */}
       <div className="relative h-[1.5px] bg-border/30">
         <div
-          className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary via-[#8AC926] to-[#6A4C93] origin-left"
-          style={{ width: `${progress * 100}%`, willChange: "width" }}
+          className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary via-[#8AC926] to-[#6A4C93] origin-left transition-none"
+          style={{ width: `${progress * 100}%` }}
         />
       </div>
     </header>

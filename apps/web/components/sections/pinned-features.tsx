@@ -64,13 +64,23 @@ export function PinnedFeatures() {
     if (total === 0) return
 
     // Set initial visibility entirely via direct style assignment.
-    // This is the ONLY place opacity is set — no GSAP opacity tweens at all.
+    // Old panels snap hidden instantly (no transition) to prevent overlap.
+    // Only the incoming panel gets a fade-in — zero crossfade duplication.
     const applyVisibility = (idx: number, animate: boolean) => {
       panelEls.forEach((el, i) => {
-        el.style.transition = animate ? "opacity 0.45s ease, transform 0.45s ease" : "none"
-        el.style.opacity = i === idx ? "1" : "0"
-        el.style.transform = i === idx ? "translateY(0)" : i < idx ? "translateY(-24px)" : "translateY(24px)"
-        el.style.pointerEvents = i === idx ? "auto" : "none"
+        if (i === idx) {
+          // Active panel: fade in
+          el.style.transition = animate ? "opacity 0.3s ease, transform 0.3s ease" : "none"
+          el.style.opacity = "1"
+          el.style.transform = "translateY(0)"
+          el.style.pointerEvents = "auto"
+        } else {
+          // Inactive panels: snap hidden immediately — never overlap with active
+          el.style.transition = "none"
+          el.style.opacity = "0"
+          el.style.transform = i < idx ? "translateY(-20px)" : "translateY(20px)"
+          el.style.pointerEvents = "none"
+        }
       })
     }
 
