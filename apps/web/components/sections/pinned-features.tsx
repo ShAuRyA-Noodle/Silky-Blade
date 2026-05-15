@@ -87,7 +87,7 @@ export function PinnedFeatures() {
       ScrollTrigger.create({
         trigger: root,
         start: "top top",
-        end: () => `+=${total * 100}vh`,
+        end: () => `+=${total * 200}vh`,
         pin: true,
         pinType: "transform",
         anticipatePin: 1,
@@ -110,7 +110,7 @@ export function PinnedFeatures() {
           scrollTrigger: {
             trigger: root,
             start: "top top",
-            end: () => `+=${total * 100}vh`,
+            end: () => `+=${total * 200}vh`,
             scrub: true,
             pinType: "transform",
             invalidateOnRefresh: true,
