@@ -100,9 +100,14 @@ export function LiveSignals() {
         </div>
 
         {err ? (
-          <div className="rounded-2xl border border-destructive/40 bg-destructive/5 p-6 text-sm font-mono text-destructive">
-            Signals endpoint unreachable: {err}. Start the API at{" "}
-            <span className="text-foreground">{API_BASE_URL}</span>.
+          <div className="rounded-2xl border border-border/40 bg-card/20 p-10 text-center">
+            <div className="w-2 h-2 rounded-full bg-muted-foreground/40 mx-auto mb-4" />
+            <div className="text-sm font-mono text-muted-foreground">
+              Signal engine offline — API not reachable.
+            </div>
+            <div className="mt-2 text-[11px] font-mono text-muted-foreground/50 tracking-[0.15em] uppercase">
+              No synthetic data shown. Start the backend to see live rankings.
+            </div>
           </div>
         ) : loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -114,9 +119,13 @@ export function LiveSignals() {
             ))}
           </div>
         ) : empty ? (
-          <div className="rounded-2xl border border-border/60 bg-card/40 p-10 text-center">
+          <div className="rounded-2xl border border-border/40 bg-card/20 p-10 text-center">
+            <div className="w-2 h-2 rounded-full bg-primary/40 mx-auto mb-4" />
             <div className="text-sm font-mono text-muted-foreground">
-              No signals in the store yet. Run the training + signal-writer jobs.
+              No signals generated yet — model has not run today.
+            </div>
+            <div className="mt-2 text-[11px] font-mono text-muted-foreground/50 tracking-[0.15em] uppercase">
+              Run <code className="text-primary">quant ml predict</code> to populate.
             </div>
           </div>
         ) : (

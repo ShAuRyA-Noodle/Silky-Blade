@@ -57,7 +57,6 @@ class ModelRunOut(BaseModel):
 @router.get("/signals", response_model=list[SignalOut])
 async def list_signals(
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
     on_date: date | None = Query(None, alias="date"),
     direction: SignalDirection | None = Query(None),
     symbol: str | None = Query(None),
