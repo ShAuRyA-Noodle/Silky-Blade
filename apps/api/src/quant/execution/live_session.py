@@ -113,16 +113,18 @@ async def fetch_current_positions(broker_adapter: Any) -> list[Position]:
     return out
 
 
-_EMPTY_BARS = pl.DataFrame({
-    "date": pl.Series([], dtype=pl.Date),
-    "symbol": pl.Series([], dtype=pl.Utf8),
-    "open": pl.Series([], dtype=pl.Float64),
-    "high": pl.Series([], dtype=pl.Float64),
-    "low": pl.Series([], dtype=pl.Float64),
-    "close": pl.Series([], dtype=pl.Float64),
-    "volume": pl.Series([], dtype=pl.Float64),
-    "adj_close": pl.Series([], dtype=pl.Float64),
-})
+_EMPTY_BARS = pl.DataFrame(
+    {
+        "date": pl.Series([], dtype=pl.Date),
+        "symbol": pl.Series([], dtype=pl.Utf8),
+        "open": pl.Series([], dtype=pl.Float64),
+        "high": pl.Series([], dtype=pl.Float64),
+        "low": pl.Series([], dtype=pl.Float64),
+        "close": pl.Series([], dtype=pl.Float64),
+        "volume": pl.Series([], dtype=pl.Float64),
+        "adj_close": pl.Series([], dtype=pl.Float64),
+    }
+)
 
 
 async def fetch_recent_bars(
@@ -155,9 +157,7 @@ async def fetch_recent_bars(
                 continue
             raw_date = b.get("t") or b.get("date") or ""
             try:
-                parsed_date: date = datetime.fromisoformat(
-                    str(raw_date).replace("Z", "+00:00")
-                ).date()
+                parsed_date: date = datetime.fromisoformat(str(raw_date).replace("Z", "+00:00")).date()
             except ValueError:
                 continue
             adj = b.get("adj_close") or b.get("c") or b.get("close")
@@ -167,16 +167,18 @@ async def fetch_recent_bars(
                 adj_f = float(adj)
             except (ValueError, TypeError):
                 continue
-            rows.append({
-                "date": parsed_date,
-                "symbol": str(sym),
-                "open": float(b.get("o") or b.get("open") or adj_f),
-                "high": float(b.get("h") or b.get("high") or adj_f),
-                "low": float(b.get("l") or b.get("low") or adj_f),
-                "close": float(b.get("c") or b.get("close") or adj_f),
-                "volume": float(b.get("v") or b.get("volume") or 0.0),
-                "adj_close": adj_f,
-            })
+            rows.append(
+                {
+                    "date": parsed_date,
+                    "symbol": str(sym),
+                    "open": float(b.get("o") or b.get("open") or adj_f),
+                    "high": float(b.get("h") or b.get("high") or adj_f),
+                    "low": float(b.get("l") or b.get("low") or adj_f),
+                    "close": float(b.get("c") or b.get("close") or adj_f),
+                    "volume": float(b.get("v") or b.get("volume") or 0.0),
+                    "adj_close": adj_f,
+                }
+            )
     if not rows:
         return _EMPTY_BARS
     return pl.DataFrame(rows)
@@ -257,7 +259,8 @@ async def _submit_with_recovery(
                 msg = (
                     f"PARTIAL REBALANCE in {session_id}: "
                     f"{len(sell_acks)} SELL(s) submitted, BUY submission failed: {exc}. "
-                    f"Sell order IDs: {[a.broker_order_id for a in sell_acks]}. Manual review required immediately."
+                    f"Sell order IDs: {[a.broker_order_id for a in sell_acks]}. "
+                    "Manual review required immediately."
                 )
                 log.critical(msg)
                 await send_alert(msg, "critical")
@@ -290,6 +293,7 @@ async def run_live_session(
     reconcile_max_polls: int = 30,
     reconcile_interval_seconds: float = 1.0,
     candidate_filter: Callable[[pl.DataFrame], Awaitable[pl.DataFrame]] | None = None,
+    orders_log_path: str | None = None,
 ) -> LiveSessionResult:
     """
     Pull positions + bars → score signal → [optional candidate filter] →
@@ -397,10 +401,29 @@ async def run_live_session(
 
     if allow and accepted_proposals:
         log.warning("submitting %d orders (%s)", len(accepted_proposals), reason)
-        acks, partial_failure = await _submit_with_recovery(
-            broker, accepted_proposals, session_id=sid
-        )
+        acks, partial_failure = await _submit_with_recovery(broker, accepted_proposals, session_id=sid)
         submitted = True
+
+        # Persistent audit trail — append every submitted order to CSV.
+        # CSV-as-DB: zero-infra, committed to git on every cron run, searchable.
+        if orders_log_path and acks:
+            try:
+                from quant.execution.orders_log import append_orders_log
+
+                n = append_orders_log(
+                    path=orders_log_path,
+                    session_id=sid,
+                    as_of=as_of_date,
+                    acks=acks,
+                    proposals=accepted_proposals,
+                )
+                log.info("orders_log: wrote %d rows to %s", n, orders_log_path)
+            except Exception as exc:
+                log.error("orders_log write failed: %s", exc)
+                await send_alert(
+                    f"orders_log write failed in {sid}: {exc}. Trades submitted but not logged to CSV.",
+                    "warning",
+                )
 
         if not partial_failure:
             log.info("reconciling %d orders…", len(acks))

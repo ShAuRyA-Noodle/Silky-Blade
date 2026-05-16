@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import UTC, date, datetime
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -53,12 +53,13 @@ async def _fetch_macro_headlines(*, limit: int = 25) -> list[str]:
 
     try:
         async with MarketauxAdapter() as a:
-            # Macro topic search — no symbol filter
+            # Macro fetch — no symbol filter, broad market news.
+            # Marketaux free tier doesn't expose topics param via our adapter;
+            # we get broad US-market English news and let the LLM filter relevance.
             arts = await a.news(
                 symbols=None,
                 limit=limit,
                 published_after=None,
-                topics="economy,markets,monetary-policy",
             )
             for art in arts:
                 if isinstance(art, dict):

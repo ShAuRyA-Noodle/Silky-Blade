@@ -1,0 +1,37 @@
+{
+  "feature_names": [
+    "ret_1d",
+    "ret_5d",
+    "ret_21d",
+    "ret_63d",
+    "log_ret_1d",
+    "vol_5d",
+    "vol_21d",
+    "vol_63d",
+    "sma_5",
+    "sma_20",
+    "sma_50",
+    "sma_200",
+    "ema_12",
+    "ema_26",
+    "rsi_14",
+    "macd",
+    "macd_signal",
+    "macd_hist",
+    "bb_upper",
+    "bb_lower",
+    "bb_pctb",
+    "atr_14",
+    "volume_z_21",
+    "obv",
+    "high_low_range_21",
+    "gap_overnight"
+  ],
+  "classes": [
+    -1,
+    0,
+    1
+  ],
+  "feature_set_version": "v1.0",
+  "n_boosters": 5
+}

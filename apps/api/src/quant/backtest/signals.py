@@ -107,7 +107,7 @@ def _neg_log_return_std(prices: list[float]) -> float:
 
 @dataclass(frozen=True)
 class MLPredictionsSignal:
-    """
+    r"""
     Replay an ML trainer's out-of-fold predictions as a signal.
 
     IMPORTANT — OPTIMISM WARNING:

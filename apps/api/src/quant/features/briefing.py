@@ -90,9 +90,7 @@ async def write_briefing(
     async with OpenRouterAdapter() as adapter:
         obj, model_used = await adapter.smart_json(
             system=BRIEFING_SYSTEM,
-            user=_format_user(
-                as_of=as_of, top_picks=top_picks, regime=regime, account=account
-            ),
+            user=_format_user(as_of=as_of, top_picks=top_picks, regime=regime, account=account),
             temperature=0.4,
             max_tokens=800,
         )

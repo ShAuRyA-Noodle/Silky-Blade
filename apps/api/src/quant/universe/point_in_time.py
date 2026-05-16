@@ -130,14 +130,17 @@ def parse_changes_html(html: str) -> list[IndexChange]:
     # the constituents table.
     candidate: Tag | None = None
     for table in soup.find_all("table", class_="wikitable"):
-        header_text = " ".join(th.get_text(" ", strip=True) for th in table.find_all("th")).lower()
+        header_text = " ".join(
+            th.get_text(" ", strip=True)
+            for th in table.find_all("th")  # type: ignore[union-attr]
+        ).lower()
         if "added" in header_text and "removed" in header_text and "date" in header_text:
-            candidate = table
+            candidate = table  # type: ignore[assignment]
     if candidate is None:
         return changes
 
-    for row in candidate.find_all("tr"):
-        cells = list(row.find_all("td"))
+    for row in candidate.find_all("tr"):  # type: ignore[union-attr]
+        cells: list[Tag] = [c for c in row.find_all("td") if isinstance(c, Tag)]
         if len(cells) < 5:
             continue
         when = _parse_date(_cell_text(cells[0]))

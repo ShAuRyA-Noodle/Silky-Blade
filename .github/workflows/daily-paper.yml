@@ -78,12 +78,12 @@ jobs:
       ARTIFACTS: ../web/.oracle-artifacts
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -160,15 +160,50 @@ jobs:
           if [ -n "$OPENROUTER_API_KEY" ]; then
             SANITY_FLAG="--sanity-check"
           fi
-          python -m quant.cli paper now \
-            --signal-kind momentum \
-            --lookback-days 126 \
-            --top-k 5 \
-            --universe SP500 \
-            $REGIME_FLAG \
-            $SANITY_FLAG \
-            --submit \
-            --confirm
+          # Composite signal: LightGBM ML model (primary) + sentiment (secondary).
+          # Falls back to momentum if model artifacts missing.
+          MODEL_DIR="data/models/sp500_lightgbm_2026"
+          if [ -d "$MODEL_DIR" ] && [ -f "$ARTIFACTS/sentiment.csv" ]; then
+            echo "Using composite signal (ML + sentiment)"
+            python -m quant.cli paper now \
+              --signal-kind composite \
+              --model-dir "$MODEL_DIR" \
+              --sentiment-csv "$ARTIFACTS/sentiment.csv" \
+              --alpha 0.7 \
+              --lookback-days 126 \
+              --top-k 5 \
+              --universe SP500 \
+              $REGIME_FLAG \
+              $SANITY_FLAG \
+              --orders-log "$ARTIFACTS/orders-log.csv" \
+              --submit \
+              --confirm
+          elif [ -d "$MODEL_DIR" ]; then
+            echo "Using ml_bundle signal (no sentiment available)"
+            python -m quant.cli paper now \
+              --signal-kind ml_bundle \
+              --model-dir "$MODEL_DIR" \
+              --lookback-days 126 \
+              --top-k 5 \
+              --universe SP500 \
+              $REGIME_FLAG \
+              $SANITY_FLAG \
+              --orders-log "$ARTIFACTS/orders-log.csv" \
+              --submit \
+              --confirm
+          else
+            echo "No model artifacts — falling back to momentum"
+            python -m quant.cli paper now \
+              --signal-kind momentum \
+              --lookback-days 126 \
+              --top-k 5 \
+              --universe SP500 \
+              $REGIME_FLAG \
+              $SANITY_FLAG \
+              --orders-log "$ARTIFACTS/orders-log.csv" \
+              --submit \
+              --confirm
+          fi
 
       - name: Plan-only run (TRADING_ENABLED != true)
         if: vars.TRADING_ENABLED != 'true'
@@ -183,13 +218,25 @@ jobs:
           if [ -n "$OPENROUTER_API_KEY" ]; then
             SANITY_FLAG="--sanity-check"
           fi
-          python -m quant.cli paper now \
-            --signal-kind momentum \
-            --lookback-days 126 \
-            --top-k 5 \
-            --universe DEV \
-            $REGIME_FLAG \
-            $SANITY_FLAG
+          MODEL_DIR="data/models/sp500_lightgbm_2026"
+          if [ -d "$MODEL_DIR" ]; then
+            python -m quant.cli paper now \
+              --signal-kind ml_bundle \
+              --model-dir "$MODEL_DIR" \
+              --lookback-days 126 \
+              --top-k 5 \
+              --universe DEV \
+              $REGIME_FLAG \
+              $SANITY_FLAG
+          else
+            python -m quant.cli paper now \
+              --signal-kind momentum \
+              --lookback-days 126 \
+              --top-k 5 \
+              --universe DEV \
+              $REGIME_FLAG \
+              $SANITY_FLAG
+          fi
 
       # ---- LAYER 5: Daily briefing (depends on regime.json existing) ----
       - name: Layer 5 — daily briefing
@@ -216,7 +263,8 @@ jobs:
                   apps/web/.oracle-artifacts/sentiment.csv \
                   apps/web/.oracle-artifacts/catalysts.csv \
                   apps/web/.oracle-artifacts/regime.json \
-                  apps/web/.oracle-artifacts/briefing.json 2>/dev/null || true
+                  apps/web/.oracle-artifacts/briefing.json \
+                  apps/web/.oracle-artifacts/orders-log.csv 2>/dev/null || true
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else

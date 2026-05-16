@@ -111,15 +111,13 @@ class OpenRouterAdapter(HttpAdapter):
                 log.warning("openrouter model %s failed: %s — trying next in chain", model, exc)
                 last_exc = exc
                 continue
-        raise DataQualityError(
-            f"[openrouter] all fallback models failed: {models!r}"
-        ) from last_exc
+        raise DataQualityError(f"[openrouter] all fallback models failed: {models!r}") from last_exc
 
     def _fallback_chain(self) -> list[str]:
         """Smart-tier fallback chain — K2.5 → Flash → Pro → K2.6."""
         return [
             settings.openrouter_model_smart,  # kimi-k2.5
-            settings.openrouter_model_fast,   # deepseek-v4-flash
+            settings.openrouter_model_fast,  # deepseek-v4-flash
             "deepseek/deepseek-v4-pro",
             "moonshotai/kimi-k2.6",
         ]

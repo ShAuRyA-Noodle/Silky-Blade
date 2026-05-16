@@ -299,11 +299,17 @@ def ml_tune(
     base = load_config(config)
     typer.echo(f"Tuning '{base.name}' — {n_trials} TPE trials")
     rep = tune(base, n_trials=n_trials, seed=seed)
-    typer.echo(f"# best logloss = {rep['best_value']:.4f} (over {rep['n_trials']} trials, TUNING WINDOW ONLY — selection-biased)")
+    typer.echo(
+        f"# best logloss = {rep['best_value']:.4f} (over {rep['n_trials']} trials, "
+        "TUNING WINDOW ONLY — selection-biased)"
+    )
     typer.echo(f"# holdout start: {rep['holdout_start_date']}")
     if rep.get("holdout_metrics"):
         hm = rep["holdout_metrics"]
-        typer.echo(f"# holdout eval: logloss={hm.get('oof_logloss', 'n/a'):.4f}  auc={hm.get('oof_macro_auc', 'n/a'):.4f}")
+        typer.echo(
+            f"# holdout eval: logloss={hm.get('oof_logloss', 'n/a'):.4f}  "
+            f"auc={hm.get('oof_macro_auc', 'n/a'):.4f}"
+        )
     typer.echo("# best params:")
     for k, v in sorted(rep["best_params"].items()):
         typer.echo(f"  {k:<20} {v}")
@@ -789,11 +795,22 @@ def paper_now(
         ),
     ] = False,
     sanity_pool_size: Annotated[
-        int, typer.Option(help="How many top-scored candidates to sanity-check before final top-K selection")
+        int,
+        typer.Option(help="Top-N candidates to sanity-check before final top-K selection"),
     ] = 25,
     regime_json: Annotated[
         str,
-        typer.Option(help="Path to regime.json from `features classify-regime`. If set, scales scores by regime conviction multiplier."),
+        typer.Option(
+            help="Path to regime.json from `features classify-regime`. "
+            "If set, scales scores by regime conviction multiplier."
+        ),
+    ] = "",
+    orders_log: Annotated[
+        str,
+        typer.Option(
+            help="Path to orders-log.csv. If set, every submitted order is appended "
+            "(persistent audit trail, CSV-as-DB)."
+        ),
     ] = "",
 ) -> None:
     """
@@ -882,7 +899,9 @@ def paper_now(
             if regime_json:
                 try:
                     from pathlib import Path as _P
+
                     from quant.features.macro_regime import regime_conviction_multiplier
+
                     regime_data = json.loads(_P(regime_json).read_text(encoding="utf-8"))
                     regime_label = str(regime_data.get("regime", "neutral"))
                     mult = regime_conviction_multiplier(regime_label)
@@ -904,8 +923,7 @@ def paper_now(
 
             pool = scores.sort("score", descending=True).head(sanity_pool_size)
             cand_tuples: list[tuple[str, float]] = [
-                (str(r["symbol"]), float(r["score"]))
-                for r in pool.iter_rows(named=True)
+                (str(r["symbol"]), float(r["score"])) for r in pool.iter_rows(named=True)
             ]
             typer.echo(f"# sanity-check: reviewing top {len(cand_tuples)} candidates via LLM")
             results = await review_candidates(cand_tuples)
@@ -914,9 +932,7 @@ def paper_now(
                     typer.echo(f"  {r.decision} {r.symbol}: {r.reason[:120]}")
             filtered = filter_by_sanity(cand_tuples, results)
 
-            return _pl.DataFrame(
-                {"symbol": [s for s, _ in filtered], "score": [sc for _, sc in filtered]}
-            )
+            return _pl.DataFrame({"symbol": [s for s, _ in filtered], "score": [sc for _, sc in filtered]})
 
         candidate_filter_fn = _llm_candidate_filter
 
@@ -947,6 +963,7 @@ def paper_now(
                 confirm=confirm and submit,
                 risk_limits=risk_limits,
                 candidate_filter=candidate_filter_fn,
+                orders_log_path=orders_log or None,
             )
         finally:
             await broker_adapter.aclose()
@@ -1059,9 +1076,11 @@ def features_fetch_catalysts(
     for noisy in ("httpx", "httpcore"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
-    sym_list = list(_DEV) if symbols.upper() == "DEV" else [
-        s.strip().upper() for s in symbols.split(",") if s.strip()
-    ]
+    sym_list = (
+        list(_DEV)
+        if symbols.upper() == "DEV"
+        else [s.strip().upper() for s in symbols.split(",") if s.strip()]
+    )
     if not sym_list:
         raise typer.BadParameter("--symbols resolved to empty list")
 
@@ -1074,7 +1093,8 @@ def features_fetch_catalysts(
         typer.echo(f"# {len(non_none)} non-trivial catalysts:")
         for r in non_none[:10]:
             typer.echo(
-                f"  {r['symbol']:<6} {r['date']}  {r['catalyst_type']:<22} {r['severity']:<6} {r['summary'][:60]}"
+                f"  {r['symbol']:<6} {r['date']}  {r['catalyst_type']:<22} "
+                f"{r['severity']:<6} {r['summary'][:60]}"
             )
 
 
@@ -1123,11 +1143,13 @@ def features_briefing(
     picks: list[dict[str, Any]] = []
     if picks_json:
         from pathlib import Path as _P
+
         picks = json.loads(_P(picks_json).read_text(encoding="utf-8"))
 
     regime: dict[str, Any] | None = None
     if regime_json:
         from pathlib import Path as _P
+
         regime = json.loads(_P(regime_json).read_text(encoding="utf-8"))
 
     result = _run(write_briefing(as_of=_date.today(), top_picks=picks, regime=regime))

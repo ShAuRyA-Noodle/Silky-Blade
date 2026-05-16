@@ -148,12 +148,23 @@ ignore = [
 python_version = "3.12"
 strict = true
 warn_unreachable = true
-warn_unused_ignores = true
+# warn_unused_ignores creates noise when stub versions differ between local
+# and CI (especially bs4 / numpy). Disabled — preferring tolerance over noise.
+warn_unused_ignores = false
 plugins = ["pydantic.mypy"]
 # JSON payloads from provider APIs are untyped by nature; no-any-return would
 # force a cast() on every adapter method. Disable globally — typing discipline
 # is preserved at call sites via explicit annotations.
-disable_error_code = ["no-any-return"]
+disable_error_code = [
+    "no-any-return",
+    # numpy stubs ship without parametric generics for many call-sites; the
+    # codebase carries Float/Int arrays through helpers where the dtype is
+    # known by domain but not by mypy. Allowing bare `ndarray` is pragmatic.
+    "type-arg",
+    # Prefect's @task and @flow are untyped by design — they apply runtime
+    # metadata. The decorated functions are fully typed at the body level.
+    "untyped-decorator",
+]
 
 [[tool.mypy.overrides]]
 module = [
@@ -178,6 +189,8 @@ module = [
     "mlflow.*",
     "scipy",
     "scipy.*",
+    "redis",
+    "redis.*",
 ]
 ignore_missing_imports = true
 

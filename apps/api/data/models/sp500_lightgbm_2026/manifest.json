@@ -1,0 +1,16 @@
+{
+  "code_sha": "752ac24baf9c15d13a5b70a5dc49378b29c503c5",
+  "config_hash": "93943243004a46a7e90eaf2cfd918b30ea9b70334ee2e0082fc278110883622d",
+  "created_at": "2026-05-03T08:18:05.799136+00:00",
+  "data_fingerprint": "291f03392d34391f667239d9dbc405b538e20071aab2dfe1286533d65184c9bf",
+  "package_versions": {
+    "fastapi": "0.135.3",
+    "lightgbm": "4.6.0",
+    "mlflow": "3.11.1",
+    "numpy": "2.4.4",
+    "polars": "1.39.3",
+    "scikit-learn": "1.8.0",
+    "sqlalchemy": "2.0.49"
+  },
+  "python_version": "3.12.12"
+}

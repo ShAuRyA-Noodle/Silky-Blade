@@ -133,7 +133,7 @@ async def _review_one(
         dec = "APPROVE"
     return SanityResult(
         symbol=symbol,
-        decision=dec,  # type: ignore[arg-type]
+        decision=dec,
         reason=str(obj.get("reason", ""))[:300],
         model=model_used,
         score=score,
@@ -197,6 +197,6 @@ def filter_by_sanity(
 __all__ = [
     "Decision",
     "SanityResult",
-    "review_candidates",
     "filter_by_sanity",
+    "review_candidates",
 ]

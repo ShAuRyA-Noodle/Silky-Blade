@@ -14,6 +14,7 @@ Usage::
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from typing import Literal
@@ -28,6 +29,10 @@ _EMOJI: dict[str, str] = {
     "error": ":red_circle:",
     "critical": ":rotating_light:",
 }
+
+# Hold references to background tasks so they don't get garbage-collected
+# mid-flight. Tasks remove themselves on completion via done_callback.
+_BACKGROUND_TASKS: set[asyncio.Task[None]] = set()
 
 
 async def send_alert(message: str, level: AlertLevel = "info") -> None:
@@ -49,6 +54,7 @@ async def send_alert(message: str, level: AlertLevel = "info") -> None:
 
     try:
         import httpx
+
         async with httpx.AsyncClient(timeout=5.0) as client:
             resp = await client.post(url, json={"text": formatted})
             if resp.status_code not in (200, 204):
@@ -62,14 +68,18 @@ async def send_alert(message: str, level: AlertLevel = "info") -> None:
 def send_alert_sync(message: str, level: AlertLevel = "info") -> None:
     """Synchronous wrapper for use in non-async contexts."""
     import asyncio
+
     try:
         loop = asyncio.get_event_loop()
         if loop.is_running():
-            loop.create_task(send_alert(message, level))
+            # Fire-and-forget: hold reference on the loop so the task isn't GC'd.
+            task = loop.create_task(send_alert(message, level))
+            _BACKGROUND_TASKS.add(task)
+            task.add_done_callback(_BACKGROUND_TASKS.discard)
         else:
             loop.run_until_complete(send_alert(message, level))
     except Exception:
         log.warning("sync alert dispatch failed", exc_info=True)
 
 
-__all__ = ["send_alert", "send_alert_sync", "AlertLevel"]
+__all__ = ["AlertLevel", "send_alert", "send_alert_sync"]

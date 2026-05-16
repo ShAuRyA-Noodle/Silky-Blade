@@ -50,18 +50,37 @@ CATALYST_SYSTEM = (
     "Do not include any prose outside the JSON."
 )
 
-_VALID_TYPES = frozenset({
-    "earnings_beat", "earnings_miss", "earnings_inline",
-    "guidance_raise", "guidance_cut", "guidance_inline",
-    "fda_approval", "fda_rejection", "clinical_data",
-    "upgrade", "downgrade", "price_target_change",
-    "merger", "acquisition", "spinoff",
-    "scandal", "lawsuit", "investigation",
-    "dividend_change", "stock_split", "buyback_announce",
-    "ceo_change", "layoffs", "restructuring",
-    "product_launch", "product_recall",
-    "none",
-})
+_VALID_TYPES = frozenset(
+    {
+        "earnings_beat",
+        "earnings_miss",
+        "earnings_inline",
+        "guidance_raise",
+        "guidance_cut",
+        "guidance_inline",
+        "fda_approval",
+        "fda_rejection",
+        "clinical_data",
+        "upgrade",
+        "downgrade",
+        "price_target_change",
+        "merger",
+        "acquisition",
+        "spinoff",
+        "scandal",
+        "lawsuit",
+        "investigation",
+        "dividend_change",
+        "stock_split",
+        "buyback_announce",
+        "ceo_change",
+        "layoffs",
+        "restructuring",
+        "product_launch",
+        "product_recall",
+        "none",
+    }
+)
 
 
 async def _tag_article(
@@ -79,11 +98,7 @@ async def _tag_article(
     """
     from quant.config import settings
 
-    user = (
-        f"Ticker: {symbol}\n"
-        f"Headline: {headline}\n"
-        f"Summary: {summary or '(none)'}"
-    )
+    user = f"Ticker: {symbol}\nHeadline: {headline}\nSummary: {summary or '(none)'}"
     async with sem:
         # Try fast model first (V4 Flash) — bulk task, deterministic JSON output
         try:
@@ -96,10 +111,12 @@ async def _tag_article(
                 response_format={"type": "json_object"},
             )
             import json as _json
+
             try:
                 obj = _json.loads(raw)
             except _json.JSONDecodeError:
                 import re as _re
+
                 m = _re.search(r"\{.*\}", raw, _re.DOTALL)
                 if not m:
                     raise
@@ -145,6 +162,7 @@ async def tag_articles(
     results: list[dict[str, Any]] = []
 
     async with OpenRouterAdapter() as adapter:
+
         async def _one(art: dict[str, Any]) -> None:
             sym = str(art.get("__symbol__", "")).strip()
             headline = str(art.get("title") or "")
@@ -201,12 +219,8 @@ async def fetch_and_tag(
         return []
 
     articles: list[dict[str, Any]] = []
-    articles.extend(
-        await _fetch_marketaux_for_symbols(syms, days=days, per_call_limit=per_symbol_limit)
-    )
-    articles.extend(
-        await _fetch_newsapi_for_symbols(syms, days=days, per_call_limit=per_symbol_limit)
-    )
+    articles.extend(await _fetch_marketaux_for_symbols(syms, days=days, per_call_limit=per_symbol_limit))
+    articles.extend(await _fetch_newsapi_for_symbols(syms, days=days, per_call_limit=per_symbol_limit))
     log.info("catalyst tagger: %d articles across %d symbols", len(articles), len(syms))
     if not articles:
         return []
@@ -216,4 +230,4 @@ async def fetch_and_tag(
     return rows
 
 
-__all__ = ["tag_articles", "write_catalysts_csv", "fetch_and_tag"]
+__all__ = ["fetch_and_tag", "tag_articles", "write_catalysts_csv"]

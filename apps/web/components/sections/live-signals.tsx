@@ -54,14 +54,14 @@ export function LiveSignals({ staticSignals = [] }: LiveSignalsProps) {
           setSource("live")
         } else {
           // API online but 0 signals — fall back to static
-          setSignals(staticSignals as Signal[])
+          setSignals([...staticSignals] as Signal[])
           setSource("static")
         }
       })
       .catch((e: Error) => {
         if (e.name !== "AbortError") {
           // API offline — show pre-generated real signals
-          setSignals(staticSignals as Signal[])
+          setSignals([...staticSignals] as Signal[])
           setSource("static")
         }
       })

@@ -150,9 +150,7 @@ def tune(
             early_stopping_rounds=base_cfg.model.early_stopping_rounds,
             params=best_lgbm_params,
         )
-        holdout_data: DataSpec = dataclasses.replace(
-            base_cfg.data, start_date=holdout_start
-        )
+        holdout_data: DataSpec = dataclasses.replace(base_cfg.data, start_date=holdout_start)
         holdout_cfg: TrainConfig = dataclasses.replace(
             base_cfg,
             name=f"{base_cfg.name}_holdout_eval",

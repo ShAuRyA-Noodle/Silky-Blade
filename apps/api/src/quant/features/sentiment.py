@@ -155,9 +155,11 @@ async def _score_articles(
 
     if provider == "openrouter":
         from quant.adapters.openrouter import OpenRouterAdapter
+
         adapter_cls: type = OpenRouterAdapter
     else:
         from quant.adapters.groq import GroqAdapter
+
         adapter_cls = GroqAdapter
 
     async with adapter_cls() as scorer:
@@ -169,9 +171,7 @@ async def _score_articles(
                 return
             async with sem:
                 try:
-                    res = await scorer.score_sentiment(
-                        headline=title, summary=summary, tickers=[sym]
-                    )
+                    res = await scorer.score_sentiment(headline=title, summary=summary, tickers=[sym])
                 except Exception as exc:
                     log.warning("%s score %s failed: %s", provider, sym, exc)
                     return
