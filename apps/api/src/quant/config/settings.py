@@ -84,9 +84,12 @@ class Settings(BaseSettings):
     postgres_port: int = 5432
     postgres_db: str = "quant"
     postgres_user: str = "quant"
-    postgres_password: SecretStr
-    database_url: str
-    database_url_sync: str
+    # DB/object-store creds are optional: the static-rebuild cron + serverless
+    # deploy has no Postgres/MinIO. When unset, database_url(_sync) are derived
+    # from the postgres_* components below (see _derive_infra_urls).
+    postgres_password: SecretStr = SecretStr("")
+    database_url: str = ""
+    database_url_sync: str = ""
 
     # -------- Redis --------
     redis_host: str = "redis"
@@ -96,8 +99,8 @@ class Settings(BaseSettings):
 
     # -------- MinIO --------
     minio_endpoint: str = "minio:9000"
-    minio_access_key: SecretStr
-    minio_secret_key: SecretStr
+    minio_access_key: SecretStr = SecretStr("")
+    minio_secret_key: SecretStr = SecretStr("")
     minio_bucket_models: str = "models"
     minio_bucket_reports: str = "reports"
     minio_bucket_data: str = "data"
@@ -194,6 +197,22 @@ class Settings(BaseSettings):
         if len(v.get_secret_value()) < 32:
             raise ValueError("JWT_SECRET_KEY must be at least 32 chars")
         return v
+
+    @model_validator(mode="after")
+    def _derive_infra_urls(self) -> Settings:
+        """Fill database_url(_sync) from postgres_* components when not set so
+        the SQLAlchemy engines always receive a well-formed DSN, even in the
+        DB-less serverless/cron deploy."""
+        pwd = self.postgres_password.get_secret_value()
+        dsn = (
+            f"postgresql+psycopg://{self.postgres_user}:{pwd}"
+            f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
+        )
+        if not self.database_url:
+            self.database_url = dsn
+        if not self.database_url_sync:
+            self.database_url_sync = dsn
+        return self
 
     @model_validator(mode="after")
     def _production_hardening(self) -> Settings:
